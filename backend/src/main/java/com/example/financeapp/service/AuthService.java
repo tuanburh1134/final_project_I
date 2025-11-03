@@ -1,9 +1,9 @@
 package com.example.financeapp.service;
 
-import com.example.financeapp.dto.LoginRequest;
 import com.example.financeapp.dto.RegisterRequest;
 
 public interface AuthService {
-    String login(LoginRequest request);
-    String register(RegisterRequest request);
+    void register(RegisterRequest request);
+    void sendActivationEmail(String toEmail, String token);
+    boolean verifyAccount(String token);
 }
