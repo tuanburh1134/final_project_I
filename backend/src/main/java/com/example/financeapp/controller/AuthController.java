@@ -1,6 +1,8 @@
 package com.example.financeapp.controller;
 
+import com.example.financeapp.dto.ForgotPasswordRequest;
 import com.example.financeapp.dto.RegisterRequest;
+import com.example.financeapp.dto.ResetPasswordRequest;
 import com.example.financeapp.service.AuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -36,5 +38,16 @@ public class AuthController {
 
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
         }
+    }
+    @PostMapping("/forgot-password")
+    ResponseEntity<String> forgot(@RequestBody @Valid ForgotPasswordRequest req) {
+        authService.forgotPassword(req.getEmail());
+        return ResponseEntity.ok("Link reset đã gửi tới email.");
+    }
+
+    @PostMapping("/reset-password")
+    ResponseEntity<String> reset(@RequestBody @Valid ResetPasswordRequest req) {
+        authService.resetPassword(req.getToken(), req.getNewPassword(), req.getConfirmPassword());
+        return ResponseEntity.ok("Mật khẩu đã thay đổi.");
     }
 }

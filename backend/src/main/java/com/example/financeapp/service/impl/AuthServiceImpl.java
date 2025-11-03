@@ -1,8 +1,10 @@
 package com.example.financeapp.service.impl;
 
 import com.example.financeapp.dto.RegisterRequest;
+import com.example.financeapp.entity.PasswordResetToken;
 import com.example.financeapp.entity.User;
 import com.example.financeapp.entity.VerificationToken;
+import com.example.financeapp.repository.PasswordResetTokenRepository;
 import com.example.financeapp.repository.UserRepository;
 import com.example.financeapp.repository.VerificationTokenRepository;
 import com.example.financeapp.service.AuthService;
@@ -26,6 +28,7 @@ public class AuthServiceImpl implements AuthService {
     private final VerificationTokenRepository tokenRepository;
     private final JavaMailSender mailSender;
     private final JwtTokenUtil jwtTokenUtil;
+    private final PasswordResetTokenRepository resetRepo;
 
     @Value("${app.base-url}")
     private String baseUrl;
@@ -98,5 +101,34 @@ public class AuthServiceImpl implements AuthService {
         tokenRepository.delete(verificationToken);
 
         return true;
+    }
+    @Override
+    public void forgotPassword(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Email không tồn tại."));
+        String token = jwtTokenUtil.generateVerificationToken(user); // reuse, purpose=verification
+        PasswordResetToken reset = new PasswordResetToken(token, user);
+        resetRepo.save(reset);
+        sendResetEmail(user.getEmail(), token);
+    }
+
+    private void sendResetEmail(String email, String token) {
+        SimpleMailMessage msg = new SimpleMailMessage();
+        msg.setTo(email); msg.setSubject("Đặt lại mật khẩu FinanceApp");
+        String url = baseUrl + "/reset-password?token=" + token;
+        msg.setText("Nhấp link để đặt lại mật khẩu (hết hạn 15 phút):\n" + url);
+        mailSender.send(msg);
+    }
+
+    @Override @Transactional
+    public void resetPassword(String token, String newPwd, String confirmPwd) {
+        if (!newPwd.equals(confirmPwd)) throw new RuntimeException("Mật khẩu không khớp.");
+        PasswordResetToken reset = resetRepo.findByToken(token)
+                .orElseThrow(() -> new RuntimeException("Token không hợp lệ."));
+        if (reset.isExpired()) throw new RuntimeException("Token hết hạn.");
+        User user = reset.getUser();
+        user.setPassword(passwordEncoder.encode(newPwd));
+        userRepository.save(user);
+        resetRepo.delete(reset);
     }
 }

@@ -6,4 +6,6 @@ public interface AuthService {
     void register(RegisterRequest request);
     void sendActivationEmail(String toEmail, String token);
     boolean verifyAccount(String token);
+    void forgotPassword(String email);
+    void resetPassword(String token, String newPassword, String confirmPassword);
 }
