@@ -102,13 +102,18 @@ public class AuthServiceImpl implements AuthService {
 
         return true;
     }
+    @Transactional
     @Override
     public void forgotPassword(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Email không tồn tại."));
-        String token = jwtTokenUtil.generateVerificationToken(user); // reuse, purpose=verification
-        PasswordResetToken reset = new PasswordResetToken(token, user);
+
+        resetRepo.deleteByUser(user);  // Sửa: dùng resetRepo
+
+        String token = jwtTokenUtil.generateVerificationToken(user);
+        PasswordResetToken reset = new PasswordResetToken(user);  // Dùng constructor mới
         resetRepo.save(reset);
+
         sendResetEmail(user.getEmail(), token);
     }
 
