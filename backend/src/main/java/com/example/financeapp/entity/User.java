@@ -1,28 +1,40 @@
 package com.example.financeapp.entity;
 
 import jakarta.persistence.*;
+import lombok.Data;
+import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Entity
-@Table(name = "users")
+@Data
+@Table(name = "Users")
 public class User {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long userId;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(name = "UserID")
+    private UUID userID;
 
-    private String fullName;
+    @Column(nullable = false, unique = true, length = 256)
+    private String userName;
+
+    @Column(nullable = false, unique = true, length = 100)
     private String email;
-    private String passwordHash;
 
-    public Long getUserId() { return userId; }
-    public void setUserId(Long userId) { this.userId = userId; }
+    @Column(nullable = false, length = 256)
+    private String password;
 
-    public String getFullName() { return fullName; }
-    public void setFullName(String fullName) { this.fullName = fullName; }
+    @Column(nullable = false, length = 100)
+    private String fullName;
 
-    public String getEmail() { return email; }
-    public void setEmail(String email) { this.email = email; }
+    @Column(length = 20)
+    private String phone;
 
-    public String getPasswordHash() { return passwordHash; }
-    public void setPasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
+    @Column(name = "CreatedAt", nullable = false)
+    private LocalDateTime createdAt = LocalDateTime.now();
+
+    @Column(name = "IsActive", nullable = false)
+    private boolean enabled = false;
+
+
 }
