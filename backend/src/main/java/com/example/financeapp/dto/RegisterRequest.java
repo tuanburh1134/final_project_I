@@ -16,8 +16,9 @@ public class RegisterRequest {
             message = "Mật khẩu phải chứa ít nhất 1 chữ hoa và 1 ký tự đặc biệt.")
     private String password;
 
-    @NotBlank(message = "Xác nhận mật khẩu là bắt buộc.")
-    private String confirmPassword;
+    // Getters & Setters
+    public String getFullName() { return fullName; }
+    public void setFullName(String fullName) { this.fullName = fullName; }
 
     @NotBlank(message = "Họ và tên là bắt buộc.")
     private String fullName;

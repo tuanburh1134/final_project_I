@@ -1,0 +1,33 @@
+đăng ký
+http://localhost:8080/auth/register
+{
+  "fullName": "Nguyen Van A",
+  "email": "a@example.com",
+  "password": "Abc12345!",
+  "confirmPassword": "Abc12345!",
+  "recaptchaToken": "dev-bypass"
+}
+xác nhận mã
+{
+  "email": "phutrong27082005@gmail.com",
+  "code": "156726"
+}
+đăng nhập
+ http://localhost:8080/auth/login
+ {
+   "email": "test@example.com",
+   "password": "123456"
+ }
+  đăng xuất
+  http://localhost:8080/auth/logout
+  {
+    "email": "test@example.com",
+    "password": "123456"
+  }
+  đổi mk
+  http://localhost:8080/auth/change-password
+  {
+    "email": "phutrong27082005@gmail.com",
+    "oldPassword": "123456",
+    "newPassword": "Abc@1234"
+  }
