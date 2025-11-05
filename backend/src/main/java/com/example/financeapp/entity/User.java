@@ -34,6 +34,26 @@ public class User {
     @Column(name = "code_generated_at")
     private LocalDateTime codeGeneratedAt; // Thời gian tạo mã
 
+    @Column(name = "avatar_url")
+    private String avatarUrl; // URL hoặc path đến ảnh đại diện
+
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
+
     // --- Getters & Setters ---
 
     public Long getUserId() {
@@ -98,5 +118,29 @@ public class User {
 
     public void setCodeGeneratedAt(LocalDateTime codeGeneratedAt) {
         this.codeGeneratedAt = codeGeneratedAt;
+    }
+
+    public String getAvatarUrl() {
+        return avatarUrl;
+    }
+
+    public void setAvatarUrl(String avatarUrl) {
+        this.avatarUrl = avatarUrl;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(LocalDateTime updatedAt) {
+        this.updatedAt = updatedAt;
     }
 }

@@ -23,6 +23,8 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/auth/**", "/oauth2/**", "/error").permitAll() // Cho phép public
+                        .requestMatchers("/uploads/**").permitAll() // Cho phép truy cập file upload
+                        .requestMatchers("/user/**").authenticated() // Yêu cầu authentication cho /user/**
                         .anyRequest().authenticated() // Còn lại phải có token
                 )
                 .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // Không lưu session
