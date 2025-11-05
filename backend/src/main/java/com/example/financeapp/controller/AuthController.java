@@ -72,18 +72,37 @@ public class AuthController {
             return res;
         }
 
-        // ✅ Kiểm tra CAPTCHA
-        if (!recaptchaService.verifyToken(recaptchaToken)) {
-            res.put("error", "CAPTCHA không hợp lệ");
-            return res;
+        // AuthController.java - trong phương thức register
+// ...
+
+        // ✅ Kiểm tra email trùng và trạng thái tài khoản
+        Optional<User> existingUserOpt = userRepository.findByEmail(email);
+
+        if (existingUserOpt.isPresent()) {
+            User existingUser = existingUserOpt.get();
+
+            if (existingUser.isEnabled()) {
+                // Trường hợp 1: Tài khoản đã được kích hoạt -> lỗi thực sự
+                res.put("error", "Email đã được sử dụng và tài khoản đã được kích hoạt. Vui lòng đăng nhập.");
+                return res;
+            } else {
+                // Trường hợp 2: Tài khoản đã tồn tại NHƯNG chưa được kích hoạt -> Cập nhật mã và gửi lại email
+                String newVerificationCode = String.format("%06d", new Random().nextInt(1_000_000));
+
+                // Cập nhật các trường có thể thay đổi (tên, mật khẩu nếu người dùng đã thay đổi)
+                existingUser.setFullName(fullName);
+                existingUser.setPasswordHash(passwordEncoder.encode(password)); // Cập nhật mật khẩu mới
+                existingUser.setVerificationCode(newVerificationCode);
+
+                userRepository.save(existingUser);
+                emailService.sendRegistrationVerificationEmail(email, newVerificationCode);
+
+                res.put("message", "Tài khoản đã được đăng ký nhưng chưa xác minh. Đã gửi lại mã xác minh mới vào email!");
+                return res;
+            }
         }
 
-        // ✅ Kiểm tra email trùng
-        if (userRepository.existsByEmail(email)) {
-            res.put("error", "Email đã được sử dụng");
-            return res;
-        }
-
+        // Nếu email chưa tồn tại, tiếp tục quá trình đăng ký mới như cũ
         // ✅ Tạo mã xác minh 6 chữ số
         String verificationCode = String.format("%06d", new Random().nextInt(1_000_000));
 
