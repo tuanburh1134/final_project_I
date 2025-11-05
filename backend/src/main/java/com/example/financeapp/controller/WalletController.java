@@ -234,6 +234,66 @@ public class WalletController {
     }
 
     /**
+     * Đặt ví làm mặc định
+     * POST /wallet/{walletId}/set-default
+     */
+    @PostMapping("/{walletId}/set-default")
+    public ResponseEntity<Map<String, Object>> setDefaultWallet(
+            @PathVariable Long walletId,
+            Authentication authentication) {
+
+        Map<String, Object> response = new HashMap<>();
+
+        try {
+            String email = authentication.getName();
+            WalletResponse wallet = walletService.setDefaultWallet(email, walletId);
+
+            response.put("success", true);
+            response.put("message", "Đã đặt ví mặc định thành công");
+            response.put("wallet", wallet);
+            return ResponseEntity.ok(response);
+
+        } catch (IllegalArgumentException e) {
+            response.put("success", false);
+            response.put("error", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("error", "Lỗi hệ thống: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+    /**
+     * Lấy ví mặc định
+     * GET /wallet/default
+     */
+    @GetMapping("/default")
+    public ResponseEntity<Map<String, Object>> getDefaultWallet(Authentication authentication) {
+        Map<String, Object> response = new HashMap<>();
+
+        try {
+            String email = authentication.getName();
+            WalletResponse wallet = walletService.getDefaultWallet(email);
+
+            response.put("success", true);
+            response.put("wallet", wallet);
+            return ResponseEntity.ok(response);
+
+        } catch (IllegalArgumentException e) {
+            response.put("success", false);
+            response.put("error", e.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("error", "Lỗi hệ thống: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+    /**
      * Lấy tổng số dư tất cả ví
      * GET /wallet/summary
      */

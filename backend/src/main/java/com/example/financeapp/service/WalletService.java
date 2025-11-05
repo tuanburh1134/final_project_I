@@ -45,6 +45,16 @@ public interface WalletService {
     void deleteWallet(String userEmail, Long walletId);
     
     /**
+     * Đặt ví làm mặc định
+     */
+    WalletResponse setDefaultWallet(String userEmail, Long walletId);
+    
+    /**
+     * Lấy ví mặc định của user
+     */
+    WalletResponse getDefaultWallet(String userEmail);
+    
+    /**
      * Lấy tổng số dư tất cả ví
      */
     String getTotalBalance(String userEmail);

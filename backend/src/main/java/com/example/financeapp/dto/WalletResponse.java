@@ -17,6 +17,7 @@ public class WalletResponse {
     private String description;
     private String icon;
     private boolean isActive;
+    private boolean isDefault;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -31,6 +32,7 @@ public class WalletResponse {
         this.description = wallet.getDescription();
         this.icon = wallet.getIcon();
         this.isActive = wallet.isActive();
+        this.isDefault = wallet.isDefault();
         this.createdAt = wallet.getCreatedAt();
         this.updatedAt = wallet.getUpdatedAt();
     }
@@ -107,6 +109,14 @@ public class WalletResponse {
 
     public void setActive(boolean active) {
         isActive = active;
+    }
+
+    public boolean isDefault() {
+        return isDefault;
+    }
+
+    public void setDefault(boolean aDefault) {
+        isDefault = aDefault;
     }
 
     public LocalDateTime getCreatedAt() {

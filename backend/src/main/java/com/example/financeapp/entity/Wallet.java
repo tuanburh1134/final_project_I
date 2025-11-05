@@ -39,6 +39,9 @@ public class Wallet {
     @Column(name = "is_active")
     private boolean isActive = true;
 
+    @Column(name = "is_default")
+    private boolean isDefault = false; // Mặc định: không phải ví default
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
@@ -128,6 +131,14 @@ public class Wallet {
 
     public void setActive(boolean active) {
         isActive = active;
+    }
+
+    public boolean isDefault() {
+        return isDefault;
+    }
+
+    public void setDefault(boolean aDefault) {
+        isDefault = aDefault;
     }
 
     public LocalDateTime getCreatedAt() {

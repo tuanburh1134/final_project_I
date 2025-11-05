@@ -146,7 +146,65 @@ public class WalletServiceImpl implements WalletService {
 
         // Soft delete - chỉ set isActive = false, không xóa khỏi database
         wallet.setActive(false);
+        
+        // Nếu ví bị xóa là ví mặc định, unset default
+        if (wallet.isDefault()) {
+            wallet.setDefault(false);
+        }
+        
         walletRepository.save(wallet);
+    }
+
+    @Override
+    public WalletResponse setDefaultWallet(String userEmail, Long walletId) {
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new IllegalArgumentException("Người dùng không tồn tại"));
+
+        Wallet wallet = walletRepository.findByWalletIdAndUser(walletId, user)
+                .orElseThrow(() -> new IllegalArgumentException("Ví không tồn tại hoặc không thuộc về bạn"));
+
+        // Kiểm tra ví có active không
+        if (!wallet.isActive()) {
+            throw new IllegalArgumentException("Không thể đặt ví đã bị xóa làm mặc định");
+        }
+
+        // Unset tất cả ví default cũ của user
+        List<Wallet> allUserWallets = walletRepository.findByUser(user);
+        for (Wallet w : allUserWallets) {
+            if (w.isDefault()) {
+                w.setDefault(false);
+                walletRepository.save(w);
+            }
+        }
+
+        // Set ví mới làm default
+        wallet.setDefault(true);
+        Wallet updatedWallet = walletRepository.save(wallet);
+
+        return new WalletResponse(updatedWallet);
+    }
+
+    @Override
+    public WalletResponse getDefaultWallet(String userEmail) {
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new IllegalArgumentException("Người dùng không tồn tại"));
+
+        List<Wallet> wallets = walletRepository.findByUser(user);
+        
+        // Tìm ví default và active
+        for (Wallet wallet : wallets) {
+            if (wallet.isDefault() && wallet.isActive()) {
+                return new WalletResponse(wallet);
+            }
+        }
+
+        // Nếu không có ví default, trả về null hoặc ví active đầu tiên
+        List<Wallet> activeWallets = walletRepository.findByUserAndIsActive(user, true);
+        if (!activeWallets.isEmpty()) {
+            return new WalletResponse(activeWallets.get(0));
+        }
+
+        throw new IllegalArgumentException("Người dùng chưa có ví nào");
     }
 
     @Override
