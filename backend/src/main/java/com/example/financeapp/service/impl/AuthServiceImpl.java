@@ -1,5 +1,7 @@
 package com.example.financeapp.service.impl;
 
+import com.example.financeapp.dto.LoginRequest;
+import com.example.financeapp.dto.LoginResponse;
 import com.example.financeapp.dto.RegisterRequest;
 import com.example.financeapp.entity.PasswordResetToken;
 import com.example.financeapp.entity.User;
@@ -8,6 +10,7 @@ import com.example.financeapp.repository.PasswordResetTokenRepository;
 import com.example.financeapp.repository.UserRepository;
 import com.example.financeapp.repository.VerificationTokenRepository;
 import com.example.financeapp.service.AuthService;
+import com.example.financeapp.service.CaptchaService;
 import com.example.financeapp.security.JwtTokenUtil;
 import com.example.financeapp.repository.RoleRepository;
 import jakarta.transaction.Transactional;
@@ -15,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -29,6 +33,7 @@ public class AuthServiceImpl implements AuthService {
     private final JavaMailSender mailSender;
     private final JwtTokenUtil jwtTokenUtil;
     private final PasswordResetTokenRepository resetRepo;
+    private final CaptchaService captchaService;
 
     @Value("${app.base-url}")
     private String baseUrl;
@@ -135,5 +140,44 @@ public class AuthServiceImpl implements AuthService {
         user.setPassword(passwordEncoder.encode(newPwd));
         userRepository.save(user);
         resetRepo.delete(reset);
+    }
+
+    @Override
+    public LoginResponse login(LoginRequest request) {
+        // 1. Verify CAPTCHA
+        boolean isCaptchaValid = captchaService.verifyCaptcha(request.getCaptchaToken());
+        if (!isCaptchaValid) {
+            throw new RuntimeException("Xác thực CAPTCHA không thành công. Vui lòng thử lại.");
+        }
+
+        // 2. Find user by email
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new BadCredentialsException("Email hoặc mật khẩu không đúng."));
+
+        // 3. Check if account is enabled
+        if (!user.isEnabled()) {
+            throw new RuntimeException("Tài khoản chưa được kích hoạt. Vui lòng kiểm tra email để kích hoạt.");
+        }
+
+        // 4. Verify password
+        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            throw new BadCredentialsException("Email hoặc mật khẩu không đúng.");
+        }
+
+        // 5. Generate tokens
+        String accessToken = jwtTokenUtil.generateAccessToken(user);
+        String refreshToken = jwtTokenUtil.generateRefreshToken(user);
+
+        // 6. Build and return response
+        return LoginResponse.builder()
+                .accessToken(accessToken)
+                .refreshToken(refreshToken)
+                .tokenType("Bearer")
+                .expiresIn(jwtTokenUtil.getAccessTokenExpirationInSeconds())
+                .userId(user.getUserID())
+                .email(user.getEmail())
+                .fullName(user.getFullName())
+                .userName(user.getUserName())
+                .build();
     }
 }

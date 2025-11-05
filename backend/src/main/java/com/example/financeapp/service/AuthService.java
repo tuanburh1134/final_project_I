@@ -1,5 +1,7 @@
 package com.example.financeapp.service;
 
+import com.example.financeapp.dto.LoginRequest;
+import com.example.financeapp.dto.LoginResponse;
 import com.example.financeapp.dto.RegisterRequest;
 
 public interface AuthService {
@@ -8,4 +10,5 @@ public interface AuthService {
     boolean verifyAccount(String token);
     void forgotPassword(String email);
     void resetPassword(String token, String newPassword, String confirmPassword);
+    LoginResponse login(LoginRequest request);
 }

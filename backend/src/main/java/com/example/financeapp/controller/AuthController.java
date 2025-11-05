@@ -1,6 +1,8 @@
 package com.example.financeapp.controller;
 
 import com.example.financeapp.dto.ForgotPasswordRequest;
+import com.example.financeapp.dto.LoginRequest;
+import com.example.financeapp.dto.LoginResponse;
 import com.example.financeapp.dto.RegisterRequest;
 import com.example.financeapp.dto.ResetPasswordRequest;
 import com.example.financeapp.service.AuthService;
@@ -8,6 +10,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -49,5 +52,19 @@ public class AuthController {
     ResponseEntity<String> reset(@RequestBody @Valid ResetPasswordRequest req) {
         authService.resetPassword(req.getToken(), req.getNewPassword(), req.getConfirmPassword());
         return ResponseEntity.ok("Mật khẩu đã thay đổi.");
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request) {
+        try {
+            LoginResponse response = authService.login(request);
+            return ResponseEntity.ok(response);
+        } catch (BadCredentialsException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(e.getMessage());
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(e.getMessage());
+        }
     }
 }
