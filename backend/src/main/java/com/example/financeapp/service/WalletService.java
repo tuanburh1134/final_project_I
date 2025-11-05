@@ -1,6 +1,7 @@
 package com.example.financeapp.service;
 
 import com.example.financeapp.dto.CreateWalletRequest;
+import com.example.financeapp.dto.UpdateWalletRequest;
 import com.example.financeapp.dto.WalletResponse;
 import com.example.financeapp.entity.WalletType;
 
@@ -32,6 +33,11 @@ public interface WalletService {
      * Lấy thông tin chi tiết 1 ví
      */
     WalletResponse getWalletById(String userEmail, Long walletId);
+    
+    /**
+     * Cập nhật thông tin ví (tên, loại ví, đơn vị tiền tệ)
+     */
+    WalletResponse updateWallet(String userEmail, Long walletId, UpdateWalletRequest request);
     
     /**
      * Lấy tổng số dư tất cả ví

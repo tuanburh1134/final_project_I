@@ -1,6 +1,7 @@
 package com.example.financeapp.service.impl;
 
 import com.example.financeapp.dto.CreateWalletRequest;
+import com.example.financeapp.dto.UpdateWalletRequest;
 import com.example.financeapp.dto.WalletResponse;
 import com.example.financeapp.entity.User;
 import com.example.financeapp.entity.Wallet;
@@ -91,6 +92,48 @@ public class WalletServiceImpl implements WalletService {
                 .orElseThrow(() -> new IllegalArgumentException("Ví không tồn tại hoặc không thuộc về bạn"));
 
         return new WalletResponse(wallet);
+    }
+
+    @Override
+    public WalletResponse updateWallet(String userEmail, Long walletId, UpdateWalletRequest request) {
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new IllegalArgumentException("Người dùng không tồn tại"));
+
+        Wallet wallet = walletRepository.findByWalletIdAndUser(walletId, user)
+                .orElseThrow(() -> new IllegalArgumentException("Ví không tồn tại hoặc không thuộc về bạn"));
+
+        // Cập nhật tên ví nếu có
+        if (request.getWalletName() != null && !request.getWalletName().trim().isEmpty()) {
+            wallet.setWalletName(request.getWalletName().trim());
+        }
+
+        // Cập nhật loại ví nếu có
+        if (request.getWalletType() != null) {
+            wallet.setWalletType(request.getWalletType());
+        }
+
+        // Cập nhật đơn vị tiền tệ nếu có
+        if (request.getCurrency() != null && !request.getCurrency().trim().isEmpty()) {
+            wallet.setCurrency(request.getCurrency().trim().toUpperCase());
+        }
+
+        // Cập nhật mô tả nếu có
+        if (request.getDescription() != null) {
+            wallet.setDescription(request.getDescription());
+        }
+
+        // Cập nhật icon nếu có
+        if (request.getIcon() != null) {
+            wallet.setIcon(request.getIcon());
+        }
+
+        // Cập nhật trạng thái nếu có
+        if (request.getIsActive() != null) {
+            wallet.setActive(request.getIsActive());
+        }
+
+        Wallet updatedWallet = walletRepository.save(wallet);
+        return new WalletResponse(updatedWallet);
     }
 
     @Override

@@ -1,6 +1,7 @@
 package com.example.financeapp.controller;
 
 import com.example.financeapp.dto.CreateWalletRequest;
+import com.example.financeapp.dto.UpdateWalletRequest;
 import com.example.financeapp.dto.WalletResponse;
 import com.example.financeapp.entity.WalletType;
 import com.example.financeapp.service.WalletService;
@@ -160,6 +161,39 @@ public class WalletController {
             response.put("success", false);
             response.put("error", e.getMessage());
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("error", "Lỗi hệ thống: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+    /**
+     * Cập nhật thông tin ví (tên, loại ví, đơn vị tiền tệ)
+     * PUT /wallet/{walletId}
+     */
+    @PutMapping("/{walletId}")
+    public ResponseEntity<Map<String, Object>> updateWallet(
+            @PathVariable Long walletId,
+            @Valid @RequestBody UpdateWalletRequest request,
+            Authentication authentication) {
+
+        Map<String, Object> response = new HashMap<>();
+
+        try {
+            String email = authentication.getName();
+            WalletResponse wallet = walletService.updateWallet(email, walletId, request);
+
+            response.put("success", true);
+            response.put("message", "Cập nhật ví thành công");
+            response.put("wallet", wallet);
+            return ResponseEntity.ok(response);
+
+        } catch (IllegalArgumentException e) {
+            response.put("success", false);
+            response.put("error", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
 
         } catch (Exception e) {
             response.put("success", false);
