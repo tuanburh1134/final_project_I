@@ -40,6 +40,11 @@ public interface WalletService {
     WalletResponse updateWallet(String userEmail, Long walletId, UpdateWalletRequest request);
     
     /**
+     * Xóa ví (soft delete - set isActive = false)
+     */
+    void deleteWallet(String userEmail, Long walletId);
+    
+    /**
      * Lấy tổng số dư tất cả ví
      */
     String getTotalBalance(String userEmail);

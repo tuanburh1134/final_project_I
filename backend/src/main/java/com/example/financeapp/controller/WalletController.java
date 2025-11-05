@@ -203,6 +203,37 @@ public class WalletController {
     }
 
     /**
+     * Xóa ví (soft delete)
+     * DELETE /wallet/{walletId}
+     */
+    @DeleteMapping("/{walletId}")
+    public ResponseEntity<Map<String, Object>> deleteWallet(
+            @PathVariable Long walletId,
+            Authentication authentication) {
+
+        Map<String, Object> response = new HashMap<>();
+
+        try {
+            String email = authentication.getName();
+            walletService.deleteWallet(email, walletId);
+
+            response.put("success", true);
+            response.put("message", "Xóa ví thành công");
+            return ResponseEntity.ok(response);
+
+        } catch (IllegalArgumentException e) {
+            response.put("success", false);
+            response.put("error", e.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("error", "Lỗi hệ thống: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+    /**
      * Lấy tổng số dư tất cả ví
      * GET /wallet/summary
      */
