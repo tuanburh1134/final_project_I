@@ -2,7 +2,6 @@ package com.example.financeapp.controller;
 
 import com.example.financeapp.config.JwtUtil;
 import com.example.financeapp.dto.LoginRequest;
-import com.example.financeapp.dto.RegisterRequest;
 import com.example.financeapp.entity.User;
 import com.example.financeapp.repository.UserRepository;
 import com.example.financeapp.service.EmailService;
@@ -44,14 +43,21 @@ public class AuthController {
         String password = request.get("password");
         String confirmPassword = request.get("confirmPassword");
         String recaptchaToken = request.get("recaptchaToken");
-        // kiểm tra dữ liệu đầu vào
+
         if (fullName == null || email == null || password == null || confirmPassword == null || recaptchaToken == null) {
             res.put("error", "Thiếu thông tin đăng ký hoặc CAPTCHA (vui lòng gửi fullName, email, password, confirmPassword, recaptchaToken)");
             return res;
         }
-        // kiểm tra password confirm
+
+        // Kiểm tra password confirm
         if (!password.equals(confirmPassword)) {
             res.put("error", "Mật khẩu và xác nhận mật khẩu không khớp");
+            return res;
+        }
+
+        // ✅ Kiểm tra độ mạnh mật khẩu
+        if (!isStrongPassword(password)) {
+            res.put("error", "Mật khẩu phải tối thiểu 8 ký tự, bao gồm chữ hoa, chữ thường, số và ký tự đặc biệt");
             return res;
         }
 
@@ -168,6 +174,52 @@ public class AuthController {
     }
 
     // -----------------------------
+    // 🔑 ĐỔI MẬT KHẨU (YÊU CẦU MẠNH)
+    // -----------------------------
+    @PostMapping("/change-password")
+    public Map<String, Object> changePassword(@RequestBody Map<String, String> request) {
+        Map<String, Object> res = new HashMap<>();
+
+        String email = request.get("email");
+        String oldPassword = request.get("oldPassword");
+        String newPassword = request.get("newPassword");
+
+        if (email == null || oldPassword == null || newPassword == null) {
+            res.put("error", "Thiếu thông tin (email, mật khẩu cũ, mật khẩu mới)");
+            return res;
+        }
+
+        Optional<User> userOpt = userRepository.findByEmail(email);
+        if (userOpt.isEmpty()) {
+            res.put("error", "Tài khoản không tồn tại");
+            return res;
+        }
+
+        User user = userOpt.get();
+
+        if (!passwordEncoder.matches(oldPassword, user.getPasswordHash())) {
+            res.put("error", "Mật khẩu cũ không đúng");
+            return res;
+        }
+
+        if (!isStrongPassword(newPassword)) {
+            res.put("error", "Mật khẩu mới phải tối thiểu 8 ký tự, bao gồm chữ hoa, chữ thường, số và ký tự đặc biệt");
+            return res;
+        }
+
+        if (passwordEncoder.matches(newPassword, user.getPasswordHash())) {
+            res.put("error", "Mật khẩu mới không được trùng với mật khẩu cũ");
+            return res;
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+
+        res.put("message", "Đổi mật khẩu thành công");
+        return res;
+    }
+
+    // -----------------------------
     // 🔄 LÀM MỚI TOKEN
     // -----------------------------
     @PostMapping("/refresh")
@@ -200,5 +252,14 @@ public class AuthController {
         Map<String, String> res = new HashMap<>();
         res.put("message", "Đăng xuất thành công (xóa token ở client)");
         return res;
+    }
+
+    // -----------------------------
+    // 🔍 HÀM KIỂM TRA ĐỘ MẠNH MẬT KHẨU
+    // -----------------------------
+    private boolean isStrongPassword(String password) {
+        // Regex: ít nhất 8 ký tự, 1 chữ hoa, 1 chữ thường, 1 số, 1 ký tự đặc biệt
+        String pattern = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@$!%*?&])[A-Za-z\\d@$!%*?&]{8,}$";
+        return password.matches(pattern);
     }
 }
