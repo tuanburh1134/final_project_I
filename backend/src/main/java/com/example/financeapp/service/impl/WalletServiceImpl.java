@@ -137,6 +137,19 @@ public class WalletServiceImpl implements WalletService {
     }
 
     @Override
+    public void deleteWallet(String userEmail, Long walletId) {
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new IllegalArgumentException("Người dùng không tồn tại"));
+
+        Wallet wallet = walletRepository.findByWalletIdAndUser(walletId, user)
+                .orElseThrow(() -> new IllegalArgumentException("Ví không tồn tại hoặc không thuộc về bạn"));
+
+        // Soft delete - chỉ set isActive = false, không xóa khỏi database
+        wallet.setActive(false);
+        walletRepository.save(wallet);
+    }
+
+    @Override
     public String getTotalBalance(String userEmail) {
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new IllegalArgumentException("Người dùng không tồn tại"));
