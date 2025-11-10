@@ -52,6 +52,11 @@ public class WebSecurityConfig {
                                 "/auth/reset-password"
                         ).permitAll()
 
+                        // ✅ File APIs - GET public (xem ảnh), POST/DELETE cần authentication
+                        .requestMatchers(HttpMethod.GET, "/api/files/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/files/**").authenticated()
+                        .requestMatchers(HttpMethod.DELETE, "/api/files/**").authenticated()
+
                         // ✅ Profile APIs (yêu cầu đăng nhập)
                         .requestMatchers(
                                 "/profile",
