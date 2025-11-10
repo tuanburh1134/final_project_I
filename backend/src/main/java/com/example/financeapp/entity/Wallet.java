@@ -39,6 +39,8 @@ public class Wallet {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt = LocalDateTime.now();
 
+    @Column(name = "is_default", nullable = false)
+    private boolean isDefault = false;
 
     @PreUpdate
     public void preUpdate() {

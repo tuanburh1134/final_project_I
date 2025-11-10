@@ -4,7 +4,9 @@ import com.example.financeapp.dto.CreateWalletRequest;
 import com.example.financeapp.entity.User;
 import com.example.financeapp.entity.Wallet;
 import com.example.financeapp.repository.UserRepository;
+import com.example.financeapp.repository.WalletRepository;
 import com.example.financeapp.service.WalletService;
+import jakarta.transaction.Transactional;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -27,6 +29,9 @@ public class WalletController {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private WalletRepository walletRepository;
+
     @PostMapping("/create")
     public ResponseEntity<Map<String, Object>> createWallet(@Valid @RequestBody CreateWalletRequest request) {
         Map<String, Object> res = new HashMap<>();
@@ -45,7 +50,6 @@ public class WalletController {
             // Lấy userId THẬT của người đã đăng nhập
             Long userId = userOpt.get().getUserId();
 
-            // Gọi service với userId thật
             Wallet wallet = walletService.createWallet(userId, request);
 
             res.put("message", "Tạo ví thành công");
@@ -103,5 +107,24 @@ public class WalletController {
             res.put("error", "Lỗi máy chủ nội bộ: " + e.getMessage());
             return ResponseEntity.status(500).body(res);
         }
+    }
+
+    @PatchMapping("/{walletId}/set-default")
+    @Transactional
+    public ResponseEntity<Map<String, Object>> setDefaultWallet(@PathVariable Long walletId) {
+        Map<String, Object> res = new HashMap<>();
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        Long userId = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User không tồn tại")).getUserId();
+
+        // Kiểm tra ví thuộc user
+        walletRepository.findByWalletIdAndUser_UserId(walletId, userId)
+                .orElseThrow(() -> new RuntimeException("Ví không tồn tại hoặc không thuộc về bạn"));
+
+        walletRepository.unsetDefaultWallet(userId, walletId);
+        walletRepository.setDefaultWallet(userId, walletId);
+
+        res.put("message", "Đặt ví mặc định thành công");
+        return ResponseEntity.ok(res);
     }
 }

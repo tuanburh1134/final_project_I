@@ -43,6 +43,7 @@ public class WalletServiceImpl implements WalletService {
             throw new RuntimeException("Bạn đã có ví tên \"" + request.getWalletName() + "\"");
         }
 
+
         // 4. Tạo ví mới
         Wallet wallet = new Wallet();
         wallet.setUser(user);
@@ -50,6 +51,12 @@ public class WalletServiceImpl implements WalletService {
         wallet.setCurrencyCode(request.getCurrencyCode().toUpperCase());
         wallet.setBalance(BigDecimal.valueOf(request.getInitialBalance()));
         wallet.setDescription(request.getDescription());
+        wallet.setDefault(false);
+
+        if (Boolean.TRUE.equals(request.getSetAsDefault())) {
+            walletRepository.unsetDefaultWallet(userId, null); // hoặc dùng unsetAllDefaults nếu giữ
+            wallet.setDefault(true);
+        }
 
         return walletRepository.save(wallet);
     }
@@ -63,5 +70,16 @@ public class WalletServiceImpl implements WalletService {
     public Wallet getWalletDetails(Long userId, Long walletId) {
         return walletRepository.findByWalletIdAndUser_UserId(walletId, userId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy ví hoặc ví không thuộc quyền sở hữu của bạn."));
+    }
+
+    @Override
+    @Transactional
+    public void setDefaultWallet(Long userId, Long walletId) {
+        // Verify wallet belongs to user
+        walletRepository.findByWalletIdAndUser_UserId(walletId, userId)
+                .orElseThrow(() -> new RuntimeException("Ví không tồn tại hoặc không thuộc về bạn"));
+
+        walletRepository.unsetDefaultWallet(userId, walletId);
+        walletRepository.setDefaultWallet(userId, walletId);
     }
 }

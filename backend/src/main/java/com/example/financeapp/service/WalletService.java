@@ -12,4 +12,6 @@ public interface WalletService {
     List<Wallet> getWalletsByUserId(Long userId);
 
     Wallet getWalletDetails(Long userId, Long walletId);
+
+    void setDefaultWallet(Long userId, Long walletId);
 }
