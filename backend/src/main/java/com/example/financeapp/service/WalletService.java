@@ -13,5 +13,7 @@ public interface WalletService {
 
     Wallet getWalletDetails(Long userId, Long walletId);
 
+    Wallet updateWallet(Long userId, Long walletId, CreateWalletRequest request);
+
     void setDefaultWallet(Long userId, Long walletId);
 }

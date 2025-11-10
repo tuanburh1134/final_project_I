@@ -1,4 +1,3 @@
-
 package com.example.financeapp.entity;
 
 import jakarta.persistence.*;
@@ -24,19 +23,21 @@ public class Wallet {
     @Column(name = "wallet_name", nullable = false, length = 100)
     private String walletName;
 
-    @Column(name = "currency_code", nullable = false, length = 3)
-    private String currencyCode;
+    // ✅ Liên kết ManyToOne với Currency entity (thay vì lưu String)
+    @ManyToOne
+    @JoinColumn(name = "currency_id", nullable = false)
+    private Currency currency;
 
-    @Column(name = "balance", precision = 15, scale = 2)
+    @Column(name = "balance", precision = 15, scale = 2, nullable = false)
     private BigDecimal balance = BigDecimal.ZERO;
 
     @Column(name = "description", length = 255)
     private String description;
 
-    @Column(name = "created_at")
+    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
-    @Column(name = "updated_at")
+    @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt = LocalDateTime.now();
 
     @Column(name = "is_default", nullable = false)
@@ -46,4 +47,5 @@ public class Wallet {
     public void preUpdate() {
         this.updatedAt = LocalDateTime.now();
     }
+
 }

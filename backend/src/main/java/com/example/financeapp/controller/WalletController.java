@@ -14,7 +14,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -36,30 +35,24 @@ public class WalletController {
     public ResponseEntity<Map<String, Object>> createWallet(@Valid @RequestBody CreateWalletRequest request) {
         Map<String, Object> res = new HashMap<>();
         try {
-            // Lấy email từ token (của user đã đăng nhập)
             String email = SecurityContextHolder.getContext().getAuthentication().getName();
-
-            // Dùng email tìm User trong database
             Optional<User> userOpt = userRepository.findByEmail(email);
 
             if (userOpt.isEmpty()) {
                 res.put("error", "Không tìm thấy user với email: " + email);
-                return ResponseEntity.status(401).body(res); // 401 Unauthorized
+                return ResponseEntity.status(401).body(res);
             }
 
-            // Lấy userId THẬT của người đã đăng nhập
             Long userId = userOpt.get().getUserId();
-
             Wallet wallet = walletService.createWallet(userId, request);
 
             res.put("message", "Tạo ví thành công");
             res.put("wallet", wallet);
             return ResponseEntity.ok(res);
-
-        } catch (RuntimeException e) { // Bắt lỗi nghiệp vụ (vd: trùng tên ví)
+        } catch (RuntimeException e) {
             res.put("error", e.getMessage());
             return ResponseEntity.badRequest().body(res);
-        } catch (Exception e) { // Bắt lỗi chung
+        } catch (Exception e) {
             res.put("error", "Lỗi máy chủ nội bộ: " + e.getMessage());
             return ResponseEntity.status(500).body(res);
         }
@@ -67,7 +60,6 @@ public class WalletController {
 
     @GetMapping
     public ResponseEntity<?> getMyWallets() {
-        // Sửa tương tự cho hàm GET
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         Optional<User> userOpt = userRepository.findByEmail(email);
 
@@ -85,7 +77,6 @@ public class WalletController {
     public ResponseEntity<Map<String, Object>> getWalletDetails(@PathVariable Long walletId) {
         Map<String, Object> res = new HashMap<>();
         try {
-
             String email = SecurityContextHolder.getContext().getAuthentication().getName();
             Optional<User> userOpt = userRepository.findByEmail(email);
 
@@ -96,15 +87,39 @@ public class WalletController {
             Long userId = userOpt.get().getUserId();
 
             Wallet wallet = walletService.getWalletDetails(userId, walletId);
-
             res.put("wallet", wallet);
             return ResponseEntity.ok(res);
-
         } catch (RuntimeException e) {
             res.put("error", e.getMessage());
             return ResponseEntity.status(404).body(res);
         } catch (Exception e) {
             res.put("error", "Lỗi máy chủ nội bộ: " + e.getMessage());
+            return ResponseEntity.status(500).body(res);
+        }
+    }
+
+    // ✅ API sửa ví
+    @PutMapping("/{walletId}/update")
+    public ResponseEntity<Map<String, Object>> updateWallet(
+            @PathVariable Long walletId,
+            @Valid @RequestBody CreateWalletRequest request) {
+
+        Map<String, Object> res = new HashMap<>();
+        try {
+            String email = SecurityContextHolder.getContext().getAuthentication().getName();
+            Long userId = userRepository.findByEmail(email)
+                    .orElseThrow(() -> new RuntimeException("User không tồn tại"))
+                    .getUserId();
+
+            Wallet updatedWallet = walletService.updateWallet(userId, walletId, request);
+            res.put("message", "Cập nhật ví thành công");
+            res.put("wallet", updatedWallet);
+            return ResponseEntity.ok(res);
+        } catch (RuntimeException e) {
+            res.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(res);
+        } catch (Exception e) {
+            res.put("error", "Lỗi máy chủ: " + e.getMessage());
             return ResponseEntity.status(500).body(res);
         }
     }
@@ -117,7 +132,6 @@ public class WalletController {
         Long userId = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User không tồn tại")).getUserId();
 
-        // Kiểm tra ví thuộc user
         walletRepository.findByWalletIdAndUser_UserId(walletId, userId)
                 .orElseThrow(() -> new RuntimeException("Ví không tồn tại hoặc không thuộc về bạn"));
 
