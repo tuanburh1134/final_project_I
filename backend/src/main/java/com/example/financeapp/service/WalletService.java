@@ -10,7 +10,7 @@ import java.util.Map;
 public interface WalletService {
     Wallet createWallet(Long userId, CreateWalletRequest request);
     List<Wallet> getWalletsByUserId(Long userId);
-
+    Wallet updateWallet(Long userId, Long walletId, Map<String, Object> updates);
     BigDecimal calculateWalletBalance(Long walletId);
     Map<String, Object> getWalletDetail(Long walletId);
 }

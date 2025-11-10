@@ -179,4 +179,65 @@ public class WalletController {
 
         return ResponseEntity.ok(walletService.getWalletDetail(walletId));
     }
+    // CHỈNH SỬA VÍ
+    @PutMapping("/{walletId}/update")
+    @Transactional
+    public ResponseEntity<Map<String, Object>> updateWallet(
+            @PathVariable Long walletId,
+            @RequestBody Map<String, Object> request) {
+
+        Map<String, Object> res = new HashMap<>();
+
+        try {
+            String email = SecurityContextHolder.getContext().getAuthentication().getName();
+            Optional<User> userOpt = userRepository.findByEmail(email);
+            if (userOpt.isEmpty()) {
+                res.put("error", "Không tìm thấy user");
+                return ResponseEntity.status(401).body(res);
+            }
+
+            Optional<Wallet> walletOpt = walletRepository.findById(walletId);
+            if (walletOpt.isEmpty()) {
+                res.put("error", "Ví không tồn tại");
+                return ResponseEntity.badRequest().body(res);
+            }
+
+            Wallet wallet = walletOpt.get();
+            if (!wallet.getUser().getUserId().equals(userOpt.get().getUserId())) {
+                res.put("error", "Bạn không có quyền chỉnh sửa ví này");
+                return ResponseEntity.status(403).body(res);
+            }
+
+            // Cập nhật thông tin ví
+            if (request.containsKey("walletName")) {
+                wallet.setWalletName(request.get("walletName").toString());
+            }
+            if (request.containsKey("type")) {
+                wallet.setType(request.get("type").toString());
+            }
+            if (request.containsKey("currencyCode")) {
+                String currencyCode = request.get("currencyCode").toString();
+                Optional<Currency> currencyOpt = currencyRepository.findById(currencyCode);
+                if (currencyOpt.isEmpty()) {
+                    res.put("error", "Đơn vị tiền tệ không hợp lệ");
+                    return ResponseEntity.badRequest().body(res);
+                }
+                wallet.setCurrencyCode(currencyCode);
+            }
+            if (request.containsKey("description")) {
+                wallet.setDescription(request.get("description").toString());
+            }
+
+            walletRepository.save(wallet);
+
+            res.put("message", "Cập nhật ví thành công");
+            res.put("wallet", wallet);
+            return ResponseEntity.ok(res);
+
+        } catch (Exception e) {
+            res.put("error", "Lỗi: " + e.getMessage());
+            return ResponseEntity.status(500).body(res);
+        }
+    }
+
 }

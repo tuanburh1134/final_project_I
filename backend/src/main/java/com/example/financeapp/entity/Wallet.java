@@ -44,4 +44,11 @@ public class Wallet {
     public void preUpdate() {
         this.updatedAt = LocalDateTime.now();
     }
+
+    public Object getType() {
+        return null;
+    }
+
+    public void setType(String type) {
+    }
 }

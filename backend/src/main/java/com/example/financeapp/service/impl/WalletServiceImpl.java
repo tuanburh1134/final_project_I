@@ -55,6 +55,7 @@ public class WalletServiceImpl implements WalletService {
         wallet.setCurrencyCode(request.getCurrencyCode().toUpperCase());
         wallet.setBalance(BigDecimal.ZERO);
         wallet.setDescription(request.getDescription());
+        wallet.setType(request.getType());
 
         return walletRepository.save(wallet);
     }
@@ -62,6 +63,49 @@ public class WalletServiceImpl implements WalletService {
     @Override
     public List<Wallet> getWalletsByUserId(Long userId) {
         return walletRepository.findByUser_UserId(userId);
+    }
+
+    // ✅ HÀM CẬP NHẬT VÍ
+    @Override
+    @Transactional
+    public Wallet updateWallet(Long userId, Long walletId, Map<String, Object> updates) {
+        // Kiểm tra ví có tồn tại hay không
+        Wallet wallet = walletRepository.findById(walletId)
+                .orElseThrow(() -> new RuntimeException("Ví không tồn tại"));
+
+        // Kiểm tra quyền sở hữu
+        if (!wallet.getUser().getUserId().equals(userId)) {
+            throw new RuntimeException("Bạn không có quyền chỉnh sửa ví này");
+        }
+
+        // Cập nhật từng trường nếu có trong request
+        if (updates.containsKey("walletName")) {
+            String newName = updates.get("walletName").toString().trim();
+            if (walletRepository.existsByWalletNameAndUser_UserId(newName, userId)
+                    && !newName.equals(wallet.getWalletName())) {
+                throw new RuntimeException("Bạn đã có ví tên \"" + newName + "\"");
+            }
+            wallet.setWalletName(newName);
+        }
+
+        if (updates.containsKey("type")) {
+            wallet.setType(updates.get("type").toString().trim());
+        }
+
+        if (updates.containsKey("currencyCode")) {
+            String newCurrencyCode = updates.get("currencyCode").toString().toUpperCase();
+            if (!currencyRepository.existsById(newCurrencyCode)) {
+                throw new RuntimeException("Mã tiền tệ không hợp lệ: " + newCurrencyCode);
+            }
+            wallet.setCurrencyCode(newCurrencyCode);
+        }
+
+        if (updates.containsKey("description")) {
+            wallet.setDescription(updates.get("description").toString());
+        }
+
+        // Lưu thay đổi
+        return walletRepository.save(wallet);
     }
 
     @Override
@@ -100,6 +144,7 @@ public class WalletServiceImpl implements WalletService {
         detail.put("walletName", wallet.getWalletName());
         detail.put("currencyCode", wallet.getCurrencyCode());
         detail.put("description", wallet.getDescription());
+        detail.put("type", wallet.getType());
         detail.put("currentBalance", currentBalance);
         detail.put("totalIncome", totalIncome);
         detail.put("totalExpense", totalExpense);
