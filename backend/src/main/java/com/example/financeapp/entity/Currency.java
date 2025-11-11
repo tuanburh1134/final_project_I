@@ -1,23 +1,32 @@
 package com.example.financeapp.entity;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-
+import jakarta.persistence.*;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "currencies")
 public class Currency {
+
     @Id
-    @Column(name = "currency_code", length = 3)
+    @Column(length = 3)
     private String currencyCode;
 
-    @Column(name = "currency_name")
     private String currencyName;
 
-    @Column(name = "symbol")
+    // 🔹 Thêm mới trường symbol (ký hiệu tiền tệ)
+    @Column(length = 5)
     private String symbol;
+
+    @Column(precision = 18, scale = 6)
+    private BigDecimal rateToVnd;
+
+    private LocalDateTime lastUpdated;
+
+    // 🔹 Constructor trống
+    public Currency() {}
+
+    // 🔹 Getter & Setter
     public String getCurrencyCode() {
         return currencyCode;
     }
@@ -42,4 +51,19 @@ public class Currency {
         this.symbol = symbol;
     }
 
+    public BigDecimal getRateToVnd() {
+        return rateToVnd;
+    }
+
+    public void setRateToVnd(BigDecimal rateToVnd) {
+        this.rateToVnd = rateToVnd;
+    }
+
+    public LocalDateTime getLastUpdated() {
+        return lastUpdated;
+    }
+
+    public void setLastUpdated(LocalDateTime lastUpdated) {
+        this.lastUpdated = lastUpdated;
+    }
 }

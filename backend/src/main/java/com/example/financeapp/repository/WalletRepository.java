@@ -5,7 +5,11 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import java.time.LocalDateTime;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional; // <-- Cần thiết cho việc tìm kiếm chi tiết 1 đối tượng
 
@@ -26,4 +30,10 @@ public interface WalletRepository extends JpaRepository<Wallet, Long> {
     @Modifying
     @Query("UPDATE Wallet w SET w.isDefault = TRUE WHERE w.walletId = :walletId AND w.user.userId = :userId")
     void setDefaultWallet(@Param("userId") Long userId, @Param("walletId") Long walletId);
+    List<Wallet> findByUser_UserIdAndDeletedFalse(Long userId);
+    List<Wallet> findByUser_UserIdAndDeletedTrue(Long userId);
+    @Query("SELECT w FROM Wallet w WHERE w.deleted = true AND w.deletedAt <= :threshold")
+    List<Wallet> findWalletsToPermanentlyDelete(@Param("threshold") LocalDateTime threshold);
+
+
 }

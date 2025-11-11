@@ -13,7 +13,7 @@ import java.util.Map;
 public interface WalletService {
 
     Wallet createWallet(Long userId, CreateWalletRequest request);
-    Wallet updateWallet(Long walletId, Long userId, Map<String, Object> updates);
+
     Wallet updateWallet(Long walletId, Long userId, UpdateWalletRequest request);
 
     List<Wallet> getWalletsByUserId(Long userId);
@@ -57,4 +57,10 @@ public interface WalletService {
      * Kiểm tra user có phải owner của wallet không
      */
     boolean isOwner(Long walletId, Long userId);
+    void softDeleteWallet(Long walletId, Long userId);
+    void permanentlyDeleteWallet(Long walletId, Long userId);
+    void deleteExpiredWallets(); // Dành cho job tự động
+    List<Wallet> getArchivedWallets(Long userId);
+    void restoreWallet(Long walletId, Long userId);
+
 }

@@ -4,6 +4,7 @@ import com.example.financeapp.dto.*;
 import com.example.financeapp.entity.User;
 import com.example.financeapp.entity.Wallet;
 import com.example.financeapp.repository.UserRepository;
+import com.example.financeapp.service.CurrencyService;
 import com.example.financeapp.service.WalletService;
 import jakarta.transaction.Transactional;
 import jakarta.validation.Valid;
@@ -266,4 +267,57 @@ public class WalletController {
             return ResponseEntity.status(500).body(res);
         }
     }
+    @DeleteMapping("/{walletId}")
+    public ResponseEntity<Map<String, Object>> deleteWallet(@PathVariable Long walletId) {
+        Map<String, Object> res = new HashMap<>();
+        try {
+            Long userId = getCurrentUserId();
+            walletService.softDeleteWallet(walletId, userId);
+            res.put("message", "Ví đã được chuyển vào kho lưu trữ. Sẽ bị xoá vĩnh viễn sau 30 ngày.");
+            return ResponseEntity.ok(res);
+        } catch (RuntimeException e) {
+            res.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(res);
+        } catch (Exception e) {
+            res.put("error", "Lỗi máy chủ: " + e.getMessage());
+            return ResponseEntity.status(500).body(res);
+        }
+    }
+    @GetMapping("/archived")
+    public ResponseEntity<Map<String, Object>> getArchivedWallets() {
+        Map<String, Object> res = new HashMap<>();
+        try {
+            Long userId = getCurrentUserId();
+            List<Wallet> archivedWallets = walletService.getArchivedWallets(userId);
+
+            res.put("wallets", archivedWallets);
+            res.put("total", archivedWallets.size());
+            return ResponseEntity.ok(res);
+        } catch (Exception e) {
+            res.put("error", "Lỗi máy chủ: " + e.getMessage());
+            return ResponseEntity.status(500).body(res);
+        }
+    }
+
+    /**
+     * 🔄 Khôi phục ví từ kho lưu trữ
+     */
+    @PostMapping("/{walletId}/restore")
+    public ResponseEntity<Map<String, Object>> restoreWallet(@PathVariable Long walletId) {
+        Map<String, Object> res = new HashMap<>();
+        try {
+            Long userId = getCurrentUserId();
+            walletService.restoreWallet(walletId, userId);
+            res.put("message", "Khôi phục ví thành công");
+            return ResponseEntity.ok(res);
+        } catch (RuntimeException e) {
+            res.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(res);
+        } catch (Exception e) {
+            res.put("error", "Lỗi máy chủ: " + e.getMessage());
+            return ResponseEntity.status(500).body(res);
+        }
+    }
+
+
 }

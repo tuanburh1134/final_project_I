@@ -3,7 +3,7 @@ package com.example.financeapp.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
-
+import java.time.LocalDateTime;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -41,6 +41,13 @@ public class Wallet {
 
     @Column(name = "is_default")
     private boolean isDefault = false;
+    @Column(nullable = false)
+    private boolean deleted = false; // Đánh dấu ví bị xoá mềm
+
+    private LocalDateTime deletedAt; // Thời điểm bị xoá
+
+    @Column(nullable = false)
+    private boolean archived = false; // true = đang nằm trong kho lưu trữ
 
     public boolean isDefault() { return isDefault; }
     public void setDefault(boolean isDefault) { this.isDefault = isDefault; }
