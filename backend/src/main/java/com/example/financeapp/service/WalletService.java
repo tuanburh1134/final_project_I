@@ -51,4 +51,7 @@ public interface WalletService {
      * Kiểm tra user có phải owner của wallet không
      */
     boolean isOwner(Long walletId, Long userId);
+    Wallet updateWallet(Long userId, Long walletId, CreateWalletRequest request);
+
+    void setDefaultWallet(Long userId, Long walletId);
 }
