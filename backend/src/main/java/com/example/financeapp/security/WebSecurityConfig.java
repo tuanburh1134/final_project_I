@@ -62,6 +62,11 @@ public class WebSecurityConfig {
                                 "/wallets/**"
                         ).authenticated()
 
+                        // ✅ Wallet APIs (yêu cầu đăng nhập) - bao gồm shared wallet
+                        .requestMatchers(
+                                "/wallets/**"
+                        ).authenticated()
+
                         // (Tuỳ chọn) Cho phép GET "/" nếu bạn muốn test nhanh
                         .requestMatchers(HttpMethod.GET, "/").permitAll()
 
