@@ -8,10 +8,6 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 
-/**
- * Lớp này sẽ tự động chạy khi ứng dụng khởi động.
- * Nó dùng để "gieo" dữ liệu mầm (seed data) cho database.
- */
 @Component
 public class DataSeeder implements CommandLineRunner {
 
@@ -20,14 +16,15 @@ public class DataSeeder implements CommandLineRunner {
     @Autowired private CategoryRepository categoryRepository;
 
     @Override
-    public void run(String... args) throws Exception {
+    public void run(String... args) {
         seedCurrencies();
-        seedTransactionTypesAndCategories();
+        seedTransactionTypesAndDefaultCategories();
     }
 
+    // --- Tiền tệ ---
     private void seedCurrencies() {
         if (currencyRepository.count() == 0) {
-            System.out.println(">>> [DataSeeder] Bảng 'currencies' trống. Bắt đầu thêm dữ liệu mẫu...");
+            System.out.println(">>> [DataSeeder] Bảng 'currencies' trống. Đang thêm...");
 
             Currency vnd = new Currency();
             vnd.setCurrencyCode("VND");
@@ -40,17 +37,15 @@ public class DataSeeder implements CommandLineRunner {
             usd.setSymbol("$");
 
             currencyRepository.saveAll(List.of(vnd, usd));
-            System.out.println(">>> [DataSeeder] Đã thêm thành công 2 loại tiền tệ (VND, USD).");
-        } else {
-            System.out.println(">>> [DataSeeder] Bảng 'currencies' đã có dữ liệu. Bỏ qua seeding.");
+            System.out.println(">>> [DataSeeder] Đã thêm 2 loại tiền tệ.");
         }
     }
 
-    private void seedTransactionTypesAndCategories() {
+    // --- Loại giao dịch + Danh mục mặc định ---
+    private void seedTransactionTypesAndDefaultCategories() {
         if (transactionTypeRepository.count() == 0) {
-            System.out.println(">>> [DataSeeder] Bảng 'transaction_types' trống. Bắt đầu thêm dữ liệu mẫu...");
+            System.out.println(">>> [DataSeeder] Bảng 'transaction_types' trống. Đang thêm...");
 
-            // 1. Tạo loại giao dịch (vẫn giữ vì cần)
             TransactionType expense = new TransactionType();
             expense.setTypeName("Chi tiêu");
             transactionTypeRepository.save(expense);
@@ -59,10 +54,33 @@ public class DataSeeder implements CommandLineRunner {
             income.setTypeName("Thu nhập");
             transactionTypeRepository.save(income);
 
-            // KHÔNG tạo danh mục mẫu nữa
-            System.out.println(">>> [DataSeeder] Chỉ thêm TransactionType. Danh mục do người dùng tự tạo.");
-        } else {
-            System.out.println(">>> [DataSeeder] Bảng 'transaction_types' đã có dữ liệu. Bỏ qua seeding.");
+            // DANH MỤC MẶC ĐỊNH (hệ thống, user = null)
+            createDefault("Ăn uống", expense, "utensils");
+            createDefault("Di chuyển", expense, "car");
+            createDefault("Mua sắm", expense, "shopping-bag");
+            createDefault("Giải trí", expense, "gamepad");
+            createDefault("Hóa đơn", expense, "file-invoice-dollar");
+            createDefault("Sức khỏe", expense, "heartbeat");
+            createDefault("Giáo dục", expense, "graduation-cap");
+            createDefault("Khác", expense, "ellipsis-h");
+
+            createDefault("Lương", income, "money-bill-wave");
+            createDefault("Thưởng", income, "gift");
+            createDefault("Đầu tư", income, "chart-line");
+            createDefault("Quà tặng", income, "hand-holding-heart");
+            createDefault("Khác", income, "ellipsis-h");
+
+            System.out.println(">>> [DataSeeder] Đã thêm TransactionType + 13 danh mục mặc định.");
         }
+    }
+
+    // Tạo danh mục hệ thống (user = null)
+    private void createDefault(String name, TransactionType type, String icon) {
+        Category category = new Category();
+        category.setCategoryName(name);
+        category.setTransactionType(type);
+        category.setIcon(icon);
+        category.setUser(null); // Hệ thống
+        categoryRepository.save(category);
     }
 }

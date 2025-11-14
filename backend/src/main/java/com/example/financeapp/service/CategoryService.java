@@ -18,18 +18,17 @@ public class CategoryService {
     @Autowired private TransactionTypeRepository transactionTypeRepository;
     @Autowired private UserRepository userRepository;
 
-    // Tạo danh mục (giữ nguyên)
     public Category createCategory(Long userId, String name, String icon, Long transactionTypeId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy user"));
 
-        TransactionType transactionType = transactionTypeRepository.findById(transactionTypeId)
+        TransactionType type = transactionTypeRepository.findById(transactionTypeId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy loại giao dịch"));
 
         Category category = new Category();
         category.setCategoryName(name);
         category.setIcon(icon);
-        category.setTransactionType(transactionType);
+        category.setTransactionType(type);
         category.setUser(user);
 
         return categoryRepository.save(category);
