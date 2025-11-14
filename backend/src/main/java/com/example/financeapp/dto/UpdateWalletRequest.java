@@ -39,4 +39,7 @@ public class UpdateWalletRequest {
 
     @DecimalMin(value = "0.0", message = "Số dư không được âm")
     private BigDecimal balance;
+
+    // Đặt ví làm mặc định
+    private Boolean setAsDefault;
 }

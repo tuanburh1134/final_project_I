@@ -75,37 +75,16 @@ public class AuthController {
             return res;
         }
 
-        // AuthController.java - trong phương thức register
-// ...
-
-        // ✅ Kiểm tra email trùng và trạng thái tài khoản
+        // ✅ Kiểm tra email đã tồn tại trong database chưa
         Optional<User> existingUserOpt = userRepository.findByEmail(email);
 
         if (existingUserOpt.isPresent()) {
-            User existingUser = existingUserOpt.get();
-
-            if (existingUser.isEnabled()) {
-                // Trường hợp 1: Tài khoản đã được kích hoạt -> lỗi thực sự
-                res.put("error", "Email đã được sử dụng và tài khoản đã được kích hoạt. Vui lòng đăng nhập.");
-                return res;
-            } else {
-                // Trường hợp 2: Tài khoản đã tồn tại NHƯNG chưa được kích hoạt -> Cập nhật mã và gửi lại email
-                String newVerificationCode = String.format("%06d", new Random().nextInt(1_000_000));
-
-                // Cập nhật các trường có thể thay đổi (tên, mật khẩu nếu người dùng đã thay đổi)
-                existingUser.setFullName(fullName);
-                existingUser.setPasswordHash(passwordEncoder.encode(password)); // Cập nhật mật khẩu mới
-                existingUser.setVerificationCode(newVerificationCode);
-
-                userRepository.save(existingUser);
-                emailService.sendRegistrationVerificationEmail(email, newVerificationCode);
-
-                res.put("message", "Đăng ký thành công. Vui lòng kiểm tra email để xác minh tài khoản.");
-                return res;
-            }
+            // Email đã tồn tại (dù đã kích hoạt hay chưa) → báo lỗi
+            res.put("error", "Email đã được sử dụng. Vui lòng sử dụng một email khác để tạo tài khoản.");
+            return res;
         }
 
-        // Nếu email chưa tồn tại, tiếp tục quá trình đăng ký mới như cũ
+        // Nếu email chưa tồn tại, tiếp tục quá trình đăng ký mới
         // ✅ Tạo mã xác minh 6 chữ số
         String verificationCode = String.format("%06d", new Random().nextInt(1_000_000));
 

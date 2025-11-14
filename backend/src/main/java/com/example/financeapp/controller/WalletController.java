@@ -12,7 +12,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/wallets")
@@ -30,13 +33,14 @@ public class WalletController {
      */
     private Long getCurrentUserId() {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
-
-        return userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy thông tin user từ token"))
-                .getUserId();
+        Optional<User> userOpt = userRepository.findByEmail(email);
+        if (userOpt.isEmpty()) {
+            throw new RuntimeException("Không tìm thấy thông tin user từ token");
+        }
+        return userOpt.get().getUserId();
     }
 
-    // ========================= CREATE WALLET =========================
+    // ============ EXISTING ENDPOINTS ============
 
     @PostMapping("/create")
     public ResponseEntity<Map<String, Object>> createWallet(@Valid @RequestBody CreateWalletRequest request) {
@@ -58,14 +62,13 @@ public class WalletController {
         }
     }
 
-    // ========================= GET ALL WALLETS =========================
-
     @GetMapping
     public ResponseEntity<Map<String, Object>> getMyWallets() {
         Map<String, Object> res = new HashMap<>();
         try {
             Long userId = getCurrentUserId();
 
+            // Lấy tất cả wallets có quyền truy cập (bao gồm owned và shared)
             List<SharedWalletDTO> wallets = walletService.getAllAccessibleWallets(userId);
 
             res.put("wallets", wallets);
@@ -77,8 +80,6 @@ public class WalletController {
             return ResponseEntity.status(500).body(res);
         }
     }
-
-    // ========================= GET WALLET DETAILS =========================
 
     @GetMapping("/{walletId}")
     public ResponseEntity<Map<String, Object>> getWalletDetails(@PathVariable Long walletId) {
@@ -99,170 +100,258 @@ public class WalletController {
         }
     }
 
-    // ========================= SET DEFAULT WALLET =========================
-
     @PatchMapping("/{walletId}/set-default")
     @Transactional
     public ResponseEntity<Map<String, Object>> setDefaultWallet(@PathVariable Long walletId) {
         Map<String, Object> res = new HashMap<>();
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        Long userId = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User không tồn tại")).getUserId();
 
-        Long userId = getCurrentUserId();
         walletService.setDefaultWallet(userId, walletId);
 
         res.put("message", "Đặt ví mặc định thành công");
         return ResponseEntity.ok(res);
     }
+    // ============ SHARED WALLET ENDPOINTS ============
 
-    // ========================= SHARED WALLET ENDPOINTS =========================
+    /**
+     * Chuyển ví cá nhân thành ví nhóm (không cần email)
+     * POST /wallets/{walletId}/convert-to-group
+     */
+    @PostMapping("/{walletId}/convert-to-group")
+    public ResponseEntity<Map<String, Object>> convertToGroupWallet(@PathVariable Long walletId) {
+        Map<String, Object> res = new HashMap<>();
+        try {
+            Long userId = getCurrentUserId();
 
+            Wallet wallet = walletService.convertToGroupWallet(userId, walletId);
+
+            res.put("message", "Chuyển đổi ví thành ví nhóm thành công");
+            res.put("wallet", wallet);
+            return ResponseEntity.ok(res);
+
+        } catch (RuntimeException e) {
+            res.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(res);
+        } catch (Exception e) {
+            res.put("error", "Lỗi máy chủ nội bộ: " + e.getMessage());
+            return ResponseEntity.status(500).body(res);
+        }
+    }
+
+    /**
+     * Chia sẻ ví với người dùng khác qua email
+     * POST /wallets/{walletId}/share
+     */
     @PostMapping("/{walletId}/share")
     public ResponseEntity<Map<String, Object>> shareWallet(
             @PathVariable Long walletId,
             @Valid @RequestBody ShareWalletRequest request) {
-
         Map<String, Object> res = new HashMap<>();
-
         try {
             Long ownerId = getCurrentUserId();
+
             WalletMemberDTO member = walletService.shareWallet(walletId, ownerId, request.getEmail());
+
+            // Tự động chuyển ví thành GROUP nếu chưa phải
+            Wallet wallet = walletService.getWalletDetails(ownerId, walletId);
+            if (!"GROUP".equals(wallet.getWalletType())) {
+                walletService.convertToGroupWallet(ownerId, walletId);
+            }
 
             res.put("message", "Chia sẻ ví thành công");
             res.put("member", member);
             return ResponseEntity.ok(res);
 
-        } catch (RuntimeException ex) {
-            res.put("error", ex.getMessage());
+        } catch (RuntimeException e) {
+            res.put("error", e.getMessage());
             return ResponseEntity.badRequest().body(res);
+        } catch (Exception e) {
+            res.put("error", "Lỗi máy chủ nội bộ: " + e.getMessage());
+            return ResponseEntity.status(500).body(res);
         }
     }
 
+    /**
+     * Lấy danh sách thành viên của ví
+     * GET /wallets/{walletId}/members
+     */
     @GetMapping("/{walletId}/members")
     public ResponseEntity<Map<String, Object>> getWalletMembers(@PathVariable Long walletId) {
         Map<String, Object> res = new HashMap<>();
-
         try {
             Long userId = getCurrentUserId();
+
             List<WalletMemberDTO> members = walletService.getWalletMembers(walletId, userId);
 
             res.put("members", members);
             res.put("total", members.size());
             return ResponseEntity.ok(res);
 
-        } catch (RuntimeException ex) {
-            res.put("error", ex.getMessage());
+        } catch (RuntimeException e) {
+            res.put("error", e.getMessage());
             return ResponseEntity.status(403).body(res);
+        } catch (Exception e) {
+            res.put("error", "Lỗi máy chủ nội bộ: " + e.getMessage());
+            return ResponseEntity.status(500).body(res);
         }
     }
 
+    /**
+     * Xóa thành viên khỏi ví (chỉ owner)
+     * DELETE /wallets/{walletId}/members/{memberUserId}
+     */
     @DeleteMapping("/{walletId}/members/{memberUserId}")
     public ResponseEntity<Map<String, Object>> removeMember(
-            @PathVariable Long walletId, @PathVariable Long memberUserId) {
-
+            @PathVariable Long walletId,
+            @PathVariable Long memberUserId) {
         Map<String, Object> res = new HashMap<>();
-
         try {
             Long ownerId = getCurrentUserId();
+
             walletService.removeMember(walletId, ownerId, memberUserId);
 
             res.put("message", "Xóa thành viên thành công");
             return ResponseEntity.ok(res);
 
-        } catch (RuntimeException ex) {
-            res.put("error", ex.getMessage());
+        } catch (RuntimeException e) {
+            res.put("error", e.getMessage());
             return ResponseEntity.badRequest().body(res);
+        } catch (Exception e) {
+            res.put("error", "Lỗi máy chủ nội bộ: " + e.getMessage());
+            return ResponseEntity.status(500).body(res);
         }
     }
 
+    /**
+     * Rời khỏi ví (member tự rời)
+     * POST /wallets/{walletId}/leave
+     */
     @PostMapping("/{walletId}/leave")
     public ResponseEntity<Map<String, Object>> leaveWallet(@PathVariable Long walletId) {
-
         Map<String, Object> res = new HashMap<>();
-
         try {
             Long userId = getCurrentUserId();
+
             walletService.leaveWallet(walletId, userId);
 
             res.put("message", "Bạn đã rời khỏi ví thành công");
             return ResponseEntity.ok(res);
 
-        } catch (RuntimeException ex) {
-            res.put("error", ex.getMessage());
+        } catch (RuntimeException e) {
+            res.put("error", e.getMessage());
             return ResponseEntity.badRequest().body(res);
+        } catch (Exception e) {
+            res.put("error", "Lỗi máy chủ nội bộ: " + e.getMessage());
+            return ResponseEntity.status(500).body(res);
         }
     }
 
-
-    // ========================== ACCESS CHECK ==========================
-
+    /**
+     * Kiểm tra quyền truy cập của user đối với wallet
+     * GET /wallets/{walletId}/access
+     */
     @GetMapping("/{walletId}/access")
     public ResponseEntity<Map<String, Object>> checkAccess(@PathVariable Long walletId) {
         Map<String, Object> res = new HashMap<>();
-
-        Long userId = getCurrentUserId();
-
-        boolean hasAccess = walletService.hasAccess(walletId, userId);
-        boolean isOwner = walletService.isOwner(walletId, userId);
-
-        res.put("hasAccess", hasAccess);
-        res.put("isOwner", isOwner);
-        res.put("role", isOwner ? "OWNER" : (hasAccess ? "MEMBER" : "NONE"));
-
-        return ResponseEntity.ok(res);
-    }
-
-    // ========================== MERGE WALLET ==========================
-
-    @GetMapping("/{sourceWalletId}/merge-candidates")
-    public ResponseEntity<Map<String, Object>> getMergeCandidates(@PathVariable Long sourceWalletId) {
-        Map<String, Object> res = new HashMap<>();
-
         try {
             Long userId = getCurrentUserId();
-            List<MergeCandidateDTO> candidates = walletService.getMergeCandidates(userId, sourceWalletId);
 
-            res.put("candidateWallets", candidates.stream().filter(MergeCandidateDTO::isCanMerge).toList());
-            res.put("ineligibleWallets", candidates.stream().filter(c -> !c.isCanMerge()).toList());
-            res.put("total", candidates.size());
+            boolean hasAccess = walletService.hasAccess(walletId, userId);
+            boolean isOwner = walletService.isOwner(walletId, userId);
+
+            res.put("hasAccess", hasAccess);
+            res.put("isOwner", isOwner);
+            res.put("role", isOwner ? "OWNER" : (hasAccess ? "MEMBER" : "NONE"));
 
             return ResponseEntity.ok(res);
 
-        } catch (RuntimeException ex) {
-            res.put("error", ex.getMessage());
-            return ResponseEntity.badRequest().body(res);
+        } catch (Exception e) {
+            res.put("error", "Lỗi máy chủ nội bộ: " + e.getMessage());
+            return ResponseEntity.status(500).body(res);
         }
     }
 
+    // ============ MERGE WALLET ENDPOINTS ============
+
+    /**
+     * Lấy danh sách ví có thể gộp
+     * GET /wallets/{sourceWalletId}/merge-candidates
+     */
+    @GetMapping("/{sourceWalletId}/merge-candidates")
+    public ResponseEntity<Map<String, Object>> getMergeCandidates(@PathVariable Long sourceWalletId) {
+        Map<String, Object> res = new HashMap<>();
+        try {
+            Long userId = getCurrentUserId();
+
+            List<MergeCandidateDTO> candidates = walletService.getMergeCandidates(userId, sourceWalletId);
+
+            // Tách ra eligible và ineligible
+            List<MergeCandidateDTO> eligible = candidates.stream()
+                    .filter(MergeCandidateDTO::isCanMerge)
+                    .collect(java.util.stream.Collectors.toList());
+
+            List<MergeCandidateDTO> ineligible = candidates.stream()
+                    .filter(c -> !c.isCanMerge())
+                    .collect(java.util.stream.Collectors.toList());
+
+            res.put("candidateWallets", eligible);
+            res.put("ineligibleWallets", ineligible);
+            res.put("total", eligible.size());
+            return ResponseEntity.ok(res);
+
+        } catch (RuntimeException e) {
+            res.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(res);
+        } catch (Exception e) {
+            res.put("error", "Lỗi máy chủ nội bộ: " + e.getMessage());
+            return ResponseEntity.status(500).body(res);
+        }
+    }
+
+    /**
+     * Preview kết quả merge
+     * GET /wallets/{targetWalletId}/merge-preview?sourceWalletId=X&targetCurrency=VND
+     */
     @GetMapping("/{targetWalletId}/merge-preview")
     public ResponseEntity<Map<String, Object>> previewMerge(
             @PathVariable Long targetWalletId,
             @RequestParam Long sourceWalletId,
             @RequestParam String targetCurrency) {
-
         Map<String, Object> res = new HashMap<>();
-
         try {
             Long userId = getCurrentUserId();
+
             MergeWalletPreviewResponse preview = walletService.previewMerge(
-                    userId, sourceWalletId, targetWalletId, targetCurrency
+                    userId,
+                    sourceWalletId,
+                    targetWalletId,
+                    targetCurrency
             );
 
             res.put("preview", preview);
             return ResponseEntity.ok(res);
 
-        } catch (RuntimeException ex) {
-            res.put("error", ex.getMessage());
+        } catch (RuntimeException e) {
+            res.put("error", e.getMessage());
             return ResponseEntity.badRequest().body(res);
+        } catch (Exception e) {
+            res.put("error", "Lỗi máy chủ nội bộ: " + e.getMessage());
+            return ResponseEntity.status(500).body(res);
         }
     }
 
+    /**
+     * Thực hiện gộp ví với hỗ trợ currency conversion
+     * POST /wallets/{targetWalletId}/merge
+     */
     @PostMapping("/{targetWalletId}/merge")
     @Transactional
     public ResponseEntity<Map<String, Object>> mergeWallets(
             @PathVariable Long targetWalletId,
             @Valid @RequestBody MergeWalletRequest request) {
-
         Map<String, Object> res = new HashMap<>();
-
         try {
             Long userId = getCurrentUserId();
 
@@ -276,118 +365,163 @@ public class WalletController {
             res.put("success", true);
             res.put("message", result.getMessage());
             res.put("result", result);
-
             return ResponseEntity.ok(res);
 
-        } catch (RuntimeException ex) {
+        } catch (RuntimeException e) {
             res.put("success", false);
-            res.put("error", ex.getMessage());
+            res.put("error", e.getMessage());
             return ResponseEntity.badRequest().body(res);
+        } catch (Exception e) {
+            res.put("success", false);
+            res.put("error", "Lỗi máy chủ nội bộ: " + e.getMessage());
+            return ResponseEntity.status(500).body(res);
         }
     }
 
-    // ========================== UPDATE WALLET ==========================
+    /**
+     * Lấy lịch sử merge của user
+     * GET /wallets/merge-history
+     */
+    @GetMapping("/merge-history")
+    public ResponseEntity<Map<String, Object>> getMergeHistory() {
+        Map<String, Object> res = new HashMap<>();
+        try {
+            Long userId = getCurrentUserId();
 
+            // Note: Cần inject WalletMergeHistoryRepository vào controller
+            // Hoặc tạo method trong WalletService
+            // Tạm thời return empty list
+            res.put("history", new java.util.ArrayList<>());
+            res.put("total", 0);
+            res.put("message", "Feature coming soon");
+            return ResponseEntity.ok(res);
+
+        } catch (Exception e) {
+            res.put("error", e.getMessage());
+            return ResponseEntity.status(500).body(res);
+        }
+    }
+
+    // ============ WALLET MANAGEMENT ENDPOINTS ============
+
+    /**
+     * Cập nhật thông tin ví (chỉ tên và mô tả)
+     * PUT /wallets/{walletId}
+     */
     @PutMapping("/{walletId}")
     public ResponseEntity<Map<String, Object>> updateWallet(
             @PathVariable Long walletId,
             @Valid @RequestBody UpdateWalletRequest request) {
-
         Map<String, Object> res = new HashMap<>();
-
         try {
             Long userId = getCurrentUserId();
 
-            // HEAD version: parameter order = (userId, walletId, request)
-            Wallet updatedWallet = walletService.updateWallet(walletId, userId, request);
+            Wallet updatedWallet = walletService.updateWallet(userId, walletId, request);
 
             res.put("message", "Cập nhật ví thành công");
             res.put("wallet", updatedWallet);
-
             return ResponseEntity.ok(res);
 
-        } catch (RuntimeException ex) {
-            res.put("error", ex.getMessage());
+        } catch (RuntimeException e) {
+            res.put("error", e.getMessage());
             return ResponseEntity.badRequest().body(res);
+        } catch (Exception e) {
+            res.put("error", "Lỗi máy chủ nội bộ: " + e.getMessage());
+            return ResponseEntity.status(500).body(res);
         }
     }
 
-    // ========================== DELETE WALLET ==========================
-
+    /**
+     * Xóa ví
+     * DELETE /wallets/{walletId}
+     */
     @DeleteMapping("/{walletId}")
     public ResponseEntity<Map<String, Object>> deleteWallet(@PathVariable Long walletId) {
-
         Map<String, Object> res = new HashMap<>();
-
         try {
             Long userId = getCurrentUserId();
 
-            DeleteWalletResponse result = walletService.deleteWallet(userId, walletId);
+            DeleteWalletResponse deleteResponse = walletService.deleteWallet(userId, walletId);
 
             res.put("message", "Xóa ví thành công");
-            res.put("deletedWallet", result);
-
+            res.put("deletedWallet", deleteResponse);
             return ResponseEntity.ok(res);
 
-        } catch (RuntimeException ex) {
-            res.put("error", ex.getMessage());
+        } catch (RuntimeException e) {
+            res.put("error", e.getMessage());
             return ResponseEntity.badRequest().body(res);
+        } catch (Exception e) {
+            res.put("error", "Lỗi máy chủ nội bộ: " + e.getMessage());
+            return ResponseEntity.status(500).body(res);
         }
     }
 
-    // ========================== TRANSFER MONEY ==========================
+    // ============ MONEY TRANSFER ENDPOINTS ============
 
+    /**
+     * Lấy danh sách ví có thể chuyển tiền đến từ ví nguồn
+     * GET /wallets/{walletId}/transfer-targets
+     */
     @GetMapping("/{walletId}/transfer-targets")
     public ResponseEntity<Map<String, Object>> getTransferTargets(@PathVariable Long walletId) {
         Map<String, Object> res = new HashMap<>();
-
         try {
             Long userId = getCurrentUserId();
+
+            // Lấy ví nguồn để biết currency
             Wallet sourceWallet = walletService.getWalletDetails(userId, walletId);
-
+            
+            // Lấy tất cả ví có quyền truy cập
             List<SharedWalletDTO> allWallets = walletService.getAllAccessibleWallets(userId);
-
+            
+            // Filter: Bỏ ví nguồn và chỉ lấy ví cùng currency
             List<SharedWalletDTO> targets = allWallets.stream()
-                    .filter(w -> !w.getWalletId().equals(walletId))
-                    .filter(w -> w.getCurrencyCode().equals(sourceWallet.getCurrencyCode()))
-                    .toList();
+                    .filter(w -> !w.getWalletId().equals(walletId)) // Không phải ví nguồn
+                    .filter(w -> w.getCurrencyCode().equals(sourceWallet.getCurrencyCode())) // Cùng currency
+                    .collect(java.util.stream.Collectors.toList());
 
             res.put("sourceWallet", Map.of(
-                    "walletId", sourceWallet.getWalletId(),
-                    "walletName", sourceWallet.getWalletName(),
-                    "currencyCode", sourceWallet.getCurrencyCode(),
-                    "balance", sourceWallet.getBalance()
+                "walletId", sourceWallet.getWalletId(),
+                "walletName", sourceWallet.getWalletName(),
+                "currencyCode", sourceWallet.getCurrencyCode(),
+                "balance", sourceWallet.getBalance()
             ));
-
             res.put("targetWallets", targets);
             res.put("total", targets.size());
-
             return ResponseEntity.ok(res);
 
-        } catch (RuntimeException ex) {
-            res.put("error", ex.getMessage());
+        } catch (RuntimeException e) {
+            res.put("error", e.getMessage());
             return ResponseEntity.badRequest().body(res);
+        } catch (Exception e) {
+            res.put("error", "Lỗi máy chủ nội bộ: " + e.getMessage());
+            return ResponseEntity.status(500).body(res);
         }
     }
 
+    /**
+     * Chuyển tiền giữa các ví
+     * POST /wallets/transfer
+     */
     @PostMapping("/transfer")
     public ResponseEntity<Map<String, Object>> transferMoney(
             @Valid @RequestBody TransferMoneyRequest request) {
-
         Map<String, Object> res = new HashMap<>();
-
         try {
             Long userId = getCurrentUserId();
-            TransferMoneyResponse response = walletService.transferMoney(userId, request);
+
+            TransferMoneyResponse transferResponse = walletService.transferMoney(userId, request);
 
             res.put("message", "Chuyển tiền thành công");
-            res.put("transfer", response);
-
+            res.put("transfer", transferResponse);
             return ResponseEntity.ok(res);
 
-        } catch (RuntimeException ex) {
-            res.put("error", ex.getMessage());
+        } catch (RuntimeException e) {
+            res.put("error", e.getMessage());
             return ResponseEntity.badRequest().body(res);
+        } catch (Exception e) {
+            res.put("error", "Lỗi máy chủ nội bộ: " + e.getMessage());
+            return ResponseEntity.status(500).body(res);
         }
     }
 }
