@@ -4,6 +4,7 @@ import com.example.financeapp.entity.Category;
 import com.example.financeapp.entity.TransactionType;
 import com.example.financeapp.entity.User;
 import com.example.financeapp.repository.CategoryRepository;
+import com.example.financeapp.repository.TransactionRepository;
 import com.example.financeapp.repository.TransactionTypeRepository;
 import com.example.financeapp.service.CategoryService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,6 +22,9 @@ public class CategoryServiceImpl implements CategoryService {
 
     @Autowired
     private TransactionTypeRepository transactionTypeRepository;
+
+    @Autowired
+    private TransactionRepository transactionRepository;
 
     // ==============================
     // TẠO DANH MỤC
@@ -82,6 +86,11 @@ public class CategoryServiceImpl implements CategoryService {
 
         if (category.getUser() == null || !category.getUser().getUserId().equals(currentUser.getUserId())) {
             throw new RuntimeException("Bạn không có quyền xóa danh mục này");
+        }
+
+        // Kiểm tra xem danh mục có đang được sử dụng trong giao dịch không
+        if (transactionRepository.existsByCategory_CategoryId(id)) {
+            throw new RuntimeException("Không thể xóa danh mục. Danh mục này đang được sử dụng trong các giao dịch.");
         }
 
         categoryRepository.delete(category);

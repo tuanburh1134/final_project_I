@@ -29,6 +29,11 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
     long countByWallet_WalletId(Long walletId);
 
     /**
+     * Kiểm tra category có đang được sử dụng trong transactions không
+     */
+    boolean existsByCategory_CategoryId(Long categoryId);
+
+    /**
      * Update wallet_id cho tất cả transactions (khi merge)
      * Chuyển tất cả transactions từ sourceWalletId sang targetWalletId
      */

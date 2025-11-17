@@ -63,7 +63,7 @@ public class WalletServiceImpl implements WalletService {
         } else {
             wallet.setWalletType("PERSONAL"); // Mặc định là cá nhân
         }
-        
+
         if (Boolean.TRUE.equals(request.getSetAsDefault())) {
             walletRepository.unsetDefaultWallet(userId, null);
             wallet.setDefault(true);
@@ -737,6 +737,7 @@ public class WalletServiceImpl implements WalletService {
         transfer.setCurrencyCode(fromWallet.getCurrencyCode());
         transfer.setUser(user);
         transfer.setNote(request.getNote());
+        transfer.setImageUrl(request.getImageUrl()); // Lưu ảnh hóa đơn nếu có
         transfer.setTransferDate(time);
         transfer.setStatus(WalletTransfer.TransferStatus.COMPLETED);
         transfer.setFromBalanceBefore(fromBefore);
@@ -753,6 +754,7 @@ public class WalletServiceImpl implements WalletService {
         response.setCurrencyCode(fromWallet.getCurrencyCode());
         response.setTransferredAt(time);
         response.setNote(request.getNote());
+        response.setImageUrl(request.getImageUrl()); // Trả về ảnh hóa đơn nếu có
 
         response.setFromWalletId(fromWallet.getWalletId());
         response.setFromWalletName(fromWallet.getWalletName());

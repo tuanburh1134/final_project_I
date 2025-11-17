@@ -29,7 +29,8 @@ public class WebSecurityConfig {
                 .securityMatcher(
                         "/auth/**",
                         "/profile/**",
-                        "/wallets/**"
+                        "/wallets/**",
+                        "/files/**"
                 )
                 .csrf(csrf -> csrf.disable())
                 .cors(Customizer.withDefaults())
@@ -48,11 +49,16 @@ public class WebSecurityConfig {
                                 "/auth/verify-otp"
                         ).permitAll()
 
+                        // ✅ Public File Access (GET files - để xem ảnh)
+                        .requestMatchers(HttpMethod.GET, "/files/**").permitAll()
+
                         // ✅ API cần đăng nhập
                         .requestMatchers(
                                 "/profile/**",
-                                "/wallets/**"
+                                "/wallets/**",
+                                "/files/upload" // POST upload cần auth
                         ).authenticated()
+                        .requestMatchers(HttpMethod.DELETE, "/files/**").authenticated() // DELETE cần auth
 
 
                         .anyRequest().authenticated()

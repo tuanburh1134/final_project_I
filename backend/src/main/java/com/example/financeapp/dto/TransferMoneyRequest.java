@@ -24,6 +24,8 @@ public class TransferMoneyRequest {
     @Size(max = 500, message = "Ghi chú không được vượt quá 500 ký tự")
     private String note; // Ghi chú tùy chọn
 
+    private String imageUrl; // URL ảnh hóa đơn tùy chọn
+
     // Constructors
     public TransferMoneyRequest() {
     }
@@ -72,6 +74,14 @@ public class TransferMoneyRequest {
 
     public void setNote(String note) {
         this.note = note;
+    }
+
+    public String getImageUrl() {
+        return imageUrl;
+    }
+
+    public void setImageUrl(String imageUrl) {
+        this.imageUrl = imageUrl;
     }
 }
 

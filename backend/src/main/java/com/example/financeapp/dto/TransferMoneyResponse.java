@@ -17,6 +17,7 @@ public class TransferMoneyResponse {
     private String currencyCode;
     private LocalDateTime transferredAt;
     private String note;
+    private String imageUrl; // URL ảnh hóa đơn (nếu có)
     private String status; // COMPLETED, PENDING, CANCELLED
 
     // === FROM WALLET (SOURCE) INFO ===
@@ -80,6 +81,14 @@ public class TransferMoneyResponse {
 
     public void setNote(String note) {
         this.note = note;
+    }
+
+    public String getImageUrl() {
+        return imageUrl;
+    }
+
+    public void setImageUrl(String imageUrl) {
+        this.imageUrl = imageUrl;
     }
 
     public String getStatus() {

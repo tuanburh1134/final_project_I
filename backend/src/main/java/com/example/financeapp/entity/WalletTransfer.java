@@ -67,6 +67,9 @@ public class WalletTransfer {
     @Column(name = "note", length = 500)
     private String note;
 
+    @Column(name = "image_url", columnDefinition = "TEXT")
+    private String imageUrl; // URL ảnh hóa đơn tùy chọn
+
     @Column(name = "transfer_date", nullable = false)
     private LocalDateTime transferDate;
 
@@ -200,6 +203,14 @@ public class WalletTransfer {
 
     public void setNote(String note) {
         this.note = note;
+    }
+
+    public String getImageUrl() {
+        return imageUrl;
+    }
+
+    public void setImageUrl(String imageUrl) {
+        this.imageUrl = imageUrl;
     }
 
     public LocalDateTime getTransferDate() {

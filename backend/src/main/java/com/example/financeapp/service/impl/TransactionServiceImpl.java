@@ -9,6 +9,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class TransactionServiceImpl implements TransactionService {
@@ -102,5 +105,79 @@ public class TransactionServiceImpl implements TransactionService {
     @Transactional
     public Transaction createIncome(Long userId, CreateTransactionRequest request) {
         return createTransaction(userId, request, "Thu nhập");
+    }
+
+    // ============= GET METHODS =============
+
+    @Override
+    public List<Transaction> getAllTransactions(Long userId, Long walletId, Long typeId, LocalDateTime startDate, LocalDateTime endDate) {
+        // Lấy tất cả transactions của user
+        List<Transaction> allTransactions = transactionRepository.findByUser_UserIdOrderByTransactionDateDesc(userId);
+
+        // Filter theo walletId nếu có
+        if (walletId != null) {
+            // Kiểm tra quyền truy cập wallet
+            if (!walletMemberRepository.existsByWallet_WalletIdAndUser_UserId(walletId, userId)) {
+                throw new RuntimeException("Bạn không có quyền truy cập ví này");
+            }
+            allTransactions = allTransactions.stream()
+                    .filter(tx -> tx.getWallet().getWalletId().equals(walletId))
+                    .collect(Collectors.toList());
+        }
+
+        // Filter theo typeId nếu có
+        if (typeId != null) {
+            allTransactions = allTransactions.stream()
+                    .filter(tx -> tx.getTransactionType().getTypeId().equals(typeId))
+                    .collect(Collectors.toList());
+        }
+
+        // Filter theo date range nếu có
+        if (startDate != null) {
+            allTransactions = allTransactions.stream()
+                    .filter(tx -> tx.getTransactionDate().isAfter(startDate) || tx.getTransactionDate().isEqual(startDate))
+                    .collect(Collectors.toList());
+        }
+        if (endDate != null) {
+            allTransactions = allTransactions.stream()
+                    .filter(tx -> tx.getTransactionDate().isBefore(endDate) || tx.getTransactionDate().isEqual(endDate))
+                    .collect(Collectors.toList());
+        }
+
+        return allTransactions;
+    }
+
+    @Override
+    public Transaction getTransactionById(Long userId, Long transactionId) {
+        Transaction transaction = transactionRepository.findById(transactionId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy giao dịch"));
+
+        // Kiểm tra quyền truy cập: user phải là owner của transaction hoặc có quyền truy cập wallet
+        if (!transaction.getUser().getUserId().equals(userId)) {
+            // Kiểm tra xem user có quyền truy cập wallet không (shared wallet)
+            if (!walletMemberRepository.existsByWallet_WalletIdAndUser_UserId(
+                    transaction.getWallet().getWalletId(), userId)) {
+                throw new RuntimeException("Bạn không có quyền xem giao dịch này");
+            }
+        }
+
+        return transaction;
+    }
+
+    @Override
+    public List<Transaction> getTransactionsByWallet(Long userId, Long walletId) {
+        // Kiểm tra quyền truy cập wallet
+        if (!walletMemberRepository.existsByWallet_WalletIdAndUser_UserId(walletId, userId)) {
+            throw new RuntimeException("Bạn không có quyền truy cập ví này");
+        }
+
+        // Lấy tất cả transactions của wallet
+        // Nếu user có quyền truy cập wallet (đã check ở trên), có thể xem tất cả transactions trong wallet
+        List<Transaction> walletTransactions = transactionRepository.findByWallet_WalletId(walletId);
+        
+        // Sắp xếp theo ngày giảm dần (mới nhất trước)
+        return walletTransactions.stream()
+                .sorted((t1, t2) -> t2.getTransactionDate().compareTo(t1.getTransactionDate()))
+                .collect(Collectors.toList());
     }
 }
