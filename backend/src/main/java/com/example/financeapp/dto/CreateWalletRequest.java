@@ -27,6 +27,19 @@ public class CreateWalletRequest {
     private Boolean setAsDefault;
 
     private String walletType;
+
+    /**
+     * Danh sách email của các thành viên muốn thêm vào ví khi tạo
+     * Thành viên được thêm sẽ có quyền mặc định theo defaultMemberRole
+     */
+    private java.util.List<String> memberEmails;
+
+    /**
+     * Quyền mặc định cho các thành viên được thêm (mặc định là "MEMBER")
+     * Các giá trị hợp lệ: "MEMBER" (có thể xem và tạo giao dịch)
+     */
+    private String defaultMemberRole = "MEMBER";
+
     // Getters and Setters
     public String getWalletName() { return walletName; }
     public void setWalletName(String walletName) { this.walletName = walletName; }
@@ -45,5 +58,11 @@ public class CreateWalletRequest {
 
     public String getWalletType() { return walletType; }
     public void setWalletType(String walletType) { this.walletType = walletType; }
+
+    public java.util.List<String> getMemberEmails() { return memberEmails; }
+    public void setMemberEmails(java.util.List<String> memberEmails) { this.memberEmails = memberEmails; }
+
+    public String getDefaultMemberRole() { return defaultMemberRole; }
+    public void setDefaultMemberRole(String defaultMemberRole) { this.defaultMemberRole = defaultMemberRole; }
 
 }

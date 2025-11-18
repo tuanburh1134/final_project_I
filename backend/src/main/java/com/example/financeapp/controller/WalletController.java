@@ -270,7 +270,8 @@ public class WalletController {
                     userId,
                     request.getSourceWalletId(),
                     targetWalletId,
-                    request.getTargetCurrency()
+                    request.getTargetCurrency(),
+                    request.getTransferDefaultFlag()
             );
 
             res.put("success", true);

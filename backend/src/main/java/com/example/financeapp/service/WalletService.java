@@ -40,7 +40,7 @@ public interface WalletService {
     List<MergeCandidateDTO> getMergeCandidates(Long userId, Long sourceWalletId);
     MergeWalletPreviewResponse previewMerge(Long userId, Long sourceWalletId, Long targetWalletId, String targetCurrency);
     @Transactional
-    MergeWalletResponse mergeWallets(Long userId, Long sourceWalletId, Long targetWalletId, String targetCurrency);
+    MergeWalletResponse mergeWallets(Long userId, Long sourceWalletId, Long targetWalletId, String targetCurrency, Boolean transferDefaultFlag);
     @Transactional
     DeleteWalletResponse deleteWallet(Long userId, Long walletId);
     @Transactional

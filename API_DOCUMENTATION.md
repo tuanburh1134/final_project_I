@@ -265,9 +265,16 @@ Redirect đến Google login, sau đó redirect về:
   "initialBalance": 0.0,
   "description": "Ví mặc định",
   "setAsDefault": true,
-  "walletType": "PERSONAL"
+  "walletType": "PERSONAL",
+  "memberEmails": ["friend1@example.com", "friend2@example.com"],
+  "defaultMemberRole": "MEMBER"
 }
 ```
+
+**Lưu ý:**
+- `memberEmails` (optional): Danh sách email của các thành viên muốn thêm khi tạo ví (chỉ áp dụng cho ví nhóm)
+- `defaultMemberRole` (optional, mặc định "MEMBER"): Quyền mặc định cho thành viên được thêm. Hiện tại chỉ hỗ trợ "MEMBER"
+- Thành viên được thêm sẽ có quyền xem ví, giao dịch, danh mục và tạo giao dịch
 
 **Response:**
 ```json
@@ -355,7 +362,9 @@ Redirect đến Google login, sau đó redirect về:
   "currencyCode": "VND",
   "balance": 0.0,
   "setAsDefault": false,
-  "walletType": "GROUP"
+  "walletType": "GROUP",
+  "memberEmails": ["friend1@example.com", "friend2@example.com"],
+  "defaultMemberRole": "MEMBER"
 }
 ```
 
@@ -368,6 +377,11 @@ Redirect đến Google login, sau đó redirect về:
 - Có thể chuyển đổi loại ví: `PERSONAL` → `GROUP`
 - **Không thể** chuyển từ `GROUP` → `PERSONAL` (sẽ báo lỗi)
 - Khi chuyển `PERSONAL` → `GROUP`, hệ thống tự động đảm bảo owner được thêm vào WalletMember (nếu chưa có)
+- **Quyền sửa ví:**
+  - Ví cá nhân (PERSONAL): Chỉ chủ sở hữu (người tạo ví) mới được sửa
+  - Ví nhóm (GROUP): Chỉ chủ sở hữu (owner) mới được sửa, thành viên (member) không có quyền sửa
+- `memberEmails` (optional): Danh sách email của các thành viên muốn thêm khi cập nhật ví
+- `defaultMemberRole` (optional, mặc định "MEMBER"): Quyền mặc định cho thành viên được thêm
 
 **Response:**
 ```json
@@ -404,7 +418,7 @@ Redirect đến Google login, sau đó redirect về:
 
 ---
 
-### 5. Xóa ví
+### 5. Xóa ví (Soft Delete)
 **DELETE** `/wallets/{walletId}`
 
 **Headers:** `Authorization: Bearer <token>`
@@ -426,6 +440,10 @@ Redirect đến Google login, sau đó redirect về:
 ```
 
 **Lưu ý:** 
+- ⚠️ **Xóa mềm (Soft Delete):** Thay vì xóa thực sự, hệ thống đánh dấu ví là đã xóa bằng cách:
+  - Cập nhật `is_deleted = true`
+  - Cập nhật `deleted_at = thời gian hiện tại`
+  - Dữ liệu vẫn tồn tại trong database nhưng không hiển thị trong các truy vấn thông thường
 - Không thể xóa ví có giao dịch hoặc ví mặc định
 - Response bao gồm:
   - `wasDefault`: Ví có phải là ví mặc định không (luôn là `false` vì không thể xóa ví mặc định)
@@ -464,6 +482,30 @@ hoặc
   "message": "Đặt ví mặc định thành công"
 }
 ```
+
+**Lưu ý:**
+- Tự động bỏ ví mặc định cũ và đặt ví này làm ví mặc định
+- Ví mặc định giúp ghi giao dịch nhanh hơn mà không phải chọn lại ví mỗi lần
+- Có thể lấy ví mặc định bằng cách lọc từ danh sách ví (tìm ví có `isDefault = true`)
+
+---
+
+### 6.1. Lấy ví mặc định
+**Helper function:** Sử dụng `walletAPI.getDefaultWallet()` trong frontend
+
+**Mô tả:** Lấy ví mặc định hiện tại từ danh sách ví (tìm ví có `isDefault = true`)
+
+**Response:**
+```json
+{
+  "walletId": 1,
+  "walletName": "Ví chính",
+  "isDefault": true,
+  ...
+}
+```
+
+hoặc `null` nếu chưa có ví mặc định
 
 ---
 
@@ -726,11 +768,17 @@ hoặc
 ```json
 {
   "sourceWalletId": 1,
-  "targetCurrency": "VND"
+  "targetCurrency": "VND",
+  "transferDefaultFlag": true
 }
 ```
 
 **Mô tả:** Thực hiện gộp ví nguồn vào ví đích. Ví nguồn sẽ bị xóa sau khi gộp.
+
+**Tham số `transferDefaultFlag`:**
+- `true`: Nếu ví nguồn là ví mặc định, ví đích sẽ trở thành ví mặc định (Yes)
+- `false`: Nếu ví nguồn là ví mặc định, hủy bỏ ví mặc định (No)
+- `null` hoặc không gửi: Tự động chuyển ví mặc định sang ví đích (mặc định, giữ hành vi cũ)
 
 **Quy trình gộp ví:**
 1. Kiểm tra quyền sở hữu cả 2 ví
@@ -773,7 +821,12 @@ hoặc
   - `originalCurrency`: Loại tiền gốc
   - `exchangeRate`: Tỷ giá đã áp dụng
 - Tất cả members của ví nguồn sẽ được thêm vào ví đích (nếu chưa có)
-- Nếu ví nguồn là ví mặc định, flag sẽ được chuyển sang ví đích
+- ⚠️ **Xử lý ví mặc định khi gộp:**
+  - Nếu ví nguồn là ví mặc định, hệ thống sẽ hiển thị cảnh báo: "Khi gộp ví mặc định vào ví đích, ví đích sẽ trở thành ví mặc định. Bạn có đồng ý không?"
+  - Người dùng có thể chọn:
+    - **Yes** (`transferDefaultFlag = true`): Ví đích sẽ trở thành ví mặc định
+    - **No** (`transferDefaultFlag = false`): Hủy bỏ ví mặc định (không có ví mặc định)
+    - **Cancel**: Hủy bỏ thao tác gộp ví
 - Lịch sử merge được lưu để audit trail
 
 ---
@@ -844,7 +897,17 @@ hoặc
 "Danh mục đã được xóa thành công"
 ```
 
-**Lưu ý:** Không thể xóa danh mục hệ thống
+**Lưu ý:** 
+- Không thể xóa danh mục hệ thống
+- ⚠️ **Không thể xóa danh mục nếu đã có giao dịch sử dụng danh mục đó**
+- Nếu cố gắng xóa danh mục có giao dịch, sẽ trả về lỗi: `"Không thể xóa danh mục này vì đã có X giao dịch sử dụng danh mục này. Vui lòng xóa hoặc chuyển các giao dịch trước."`
+
+**Error Response:**
+```json
+{
+  "error": "Không thể xóa danh mục này vì đã có 5 giao dịch sử dụng danh mục này. Vui lòng xóa hoặc chuyển các giao dịch trước."
+}
+```
 
 ---
 
@@ -890,6 +953,11 @@ hoặc
 }
 ```
 
+**Lưu ý:**
+- `imageUrl` (optional): URL của ảnh hóa đơn đính kèm
+- Có thể upload ảnh trước bằng API `/files/upload`, sau đó sử dụng `fileUrl` từ response
+- Hoặc sử dụng helper function `createExpenseWithImage` trong frontend để upload và tạo giao dịch trong một lần
+
 **Response:**
 ```json
 {
@@ -927,6 +995,11 @@ hoặc
 }
 ```
 
+**Lưu ý:**
+- `imageUrl` (optional): URL của ảnh hóa đơn đính kèm
+- Có thể upload ảnh trước bằng API `/files/upload`, sau đó sử dụng `fileUrl` từ response
+- Hoặc sử dụng helper function `createIncomeWithImage` trong frontend để upload và tạo giao dịch trong một lần
+
 **Response:**
 ```json
 {
@@ -942,6 +1015,372 @@ hoặc
     }
   }
 }
+```
+
+---
+
+## 💰 Fund APIs
+
+### 1. Lấy overview trang "Quỹ của bạn"
+**GET** `/funds/overview`
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Mô tả:** Trả về dữ liệu chia theo 2 khối (Quỹ cá nhân/Quỹ nhóm) và 2 loại kỳ hạn (Có kỳ hạn/Không kỳ hạn), bao gồm tổng số quỹ, danh sách quỹ (tên, tiến độ, số thành viên, thời gian bắt đầu/kết thúc).
+
+**Response:**
+```json
+{
+  "personal": {
+    "fixedTerm": {
+      "description": "Các quỹ có mục tiêu và ngày kết thúc rõ ràng.",
+      "total": 2,
+      "funds": [
+        {
+          "fundId": 1,
+          "fundName": "Quỹ du lịch Đà Lạt",
+          "currentAmount": 10000000,
+          "targetAmount": 30000000,
+          "progressPercentage": 33.33,
+          "startDate": "2025-01-01",
+          "endDate": "2025-06-30"
+        }
+      ]
+    },
+    "flexibleTerm": {
+      "description": "Quỹ tích lũy dài hạn, không xác định mục tiêu và ngày kết thúc.",
+      "total": 1,
+      "funds": [
+        {
+          "fundId": 3,
+          "fundName": "Quỹ dự phòng",
+          "currentAmount": 5000000,
+          "startDate": "2025-01-01"
+        }
+      ]
+    }
+  },
+  "group": {
+    "fixedTerm": {
+      "description": "Quỹ góp chung có mục tiêu và thời hạn.",
+      "total": 1,
+      "funds": [
+        {
+          "fundId": 2,
+          "fundName": "Quỹ lớp 12A",
+          "memberCount": 5,
+          "currentAmount": 40000000,
+          "targetAmount": 100000000,
+          "progressPercentage": 40.00,
+          "startDate": "2025-02-01",
+          "endDate": "2025-12-31"
+        }
+      ]
+    },
+    "flexibleTerm": {
+      "description": "Quỹ nhóm dùng lâu dài, không cố định mục tiêu tiền và thời hạn.",
+      "total": 0,
+      "funds": []
+    }
+  }
+}
+```
+
+---
+
+### 2. Lấy chi tiết quỹ
+**GET** `/funds/{fundId}`
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Mô tả:** Trả về đầy đủ thông tin tổng quan, chi tiết (mục tiêu, tiến độ, lịch góp tiền, nhắc nhở, tự động nạp) và danh sách thành viên quỹ.
+
+**Response:**
+```json
+{
+  "fundId": 1,
+  "fundName": "Quỹ du lịch Đà Lạt",
+  "fundType": "PERSONAL",
+  "termType": "FIXED_TERM",
+  "currentAmount": 10000000,
+  "targetAmount": 30000000,
+  "progressPercentage": 33.33,
+  "currencyCode": "VND",
+  "walletId": 5,
+  "startDate": "2025-01-01",
+  "endDate": "2025-06-30",
+  "frequency": "MONTHLY",
+  "amountPerCycle": 5000000,
+  "reminderType": "SYSTEM_SCHEDULE",
+  "reminderTime": "08:00",
+  "autoTopupType": "REMINDER_BASED",
+  "autoTopupConfig": null,
+  "notes": "Tiết kiệm đi du lịch cùng gia đình",
+  "isClosed": false,
+  "createdAt": "2025-01-01T10:00:00",
+  "members": []
+}
+```
+
+---
+
+### 3. Tạo quỹ
+**POST** `/funds`
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Request Body:**
+```json
+{
+  "fundName": "Quỹ lớp 12A",
+  "fundType": "GROUP",
+  "termType": "FIXED_TERM",
+  "walletId": 7,
+  "targetAmount": 100000000,
+  "startDate": "2025-02-01",
+  "endDate": "2025-12-31",
+  "frequency": "MONTHLY",
+  "amountPerCycle": 8000000,
+  "memberEmails": ["friend1@example.com", "friend2@example.com"],
+  "reminderType": "SYSTEM_SCHEDULE",
+  "reminderTime": "08:00",
+  "autoTopupType": "REMINDER_BASED",
+  "autoTopupConfig": null,
+  "notes": "Quỹ góp chung lớp 12A"
+}
+```
+
+**Lưu ý:**
+- `fundType`: "PERSONAL" hoặc "GROUP"
+- `termType`: "FIXED_TERM" (có kỳ hạn) hoặc "FLEXIBLE_TERM" (không kỳ hạn)
+- `targetAmount`: Bắt buộc cho quỹ có kỳ hạn (FIXED_TERM), không cần cho quỹ không kỳ hạn (FLEXIBLE_TERM)
+- `endDate`: Bắt buộc cho quỹ có kỳ hạn, không cần cho quỹ không kỳ hạn
+- `walletId`: ID của ví được gắn với quỹ (ví này sẽ trở thành "ví quỹ", không dùng cho mục đích khác)
+- `memberEmails`: Danh sách email thành viên (chỉ áp dụng cho quỹ nhóm)
+- `reminderType`: "NONE", "SYSTEM_SCHEDULE", "CUSTOM"
+- `autoTopupType`: "NONE", "REMINDER_BASED", "CUSTOM_SCHEDULE"
+
+**Response:**
+```json
+{
+  "message": "Tạo quỹ thành công",
+  "fund": {
+    "fundId": 1,
+    "fundName": "Quỹ lớp 12A",
+    ...
+  }
+}
+```
+
+---
+
+### 4. Cập nhật quỹ
+**PUT** `/funds/{fundId}`
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Request Body:**
+```json
+{
+  "fundName": "Quỹ lớp 12A (cập nhật)",
+  "targetAmount": 120000000,
+  "startDate": "2025-02-01",
+  "endDate": "2025-12-31",
+  "frequency": "WEEKLY",
+  "amountPerCycle": 2000000,
+  "reminderType": "CUSTOM",
+  "reminderTime": "09:00",
+  "autoTopupType": "CUSTOM_SCHEDULE",
+  "autoTopupConfig": "{\"schedule\": \"MONTHLY\", \"time\": \"01-01\"}",
+  "notes": "Ghi chú mới",
+  "memberEmailsToAdd": ["newmember@example.com"],
+  "memberIdsToRemove": [5]
+}
+```
+
+**Lưu ý:**
+- Chỉ có thể sửa các trường: tên quỹ, tần suất gửi, số tiền mỗi kỳ, ngày bắt đầu/kết thúc, ghi chú, nhắc nhở, tự động nạp, thành viên
+- `memberEmailsToAdd`: Danh sách email thành viên muốn thêm (chỉ áp dụng cho quỹ nhóm)
+- `memberIdsToRemove`: Danh sách ID thành viên muốn xóa (chỉ áp dụng cho quỹ nhóm, cần popup xác nhận)
+
+**Response:**
+```json
+{
+  "message": "Cập nhật quỹ thành công",
+  "fund": { ... }
+}
+```
+
+---
+
+### 5. Đóng quỹ
+**POST** `/funds/{fundId}/close`
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Mô tả:** Tạm dừng quỹ (không nhận góp tiền mới). Cần popup xác nhận: "Bạn có chắc chắn muốn tạm dừng quỹ không?"
+
+**Response:**
+```json
+{
+  "message": "Đóng quỹ thành công",
+  "fund": {
+    "fundId": 1,
+    "isClosed": true,
+    "closedAt": "2025-01-15T10:00:00"
+  }
+}
+```
+
+---
+
+### 6. Xóa quỹ (Soft Delete)
+**DELETE** `/funds/{fundId}`
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Mô tả:** Đánh dấu `is_deleted = true` cho quỹ và ví gắn kèm (dữ liệu vẫn giữ để khôi phục). Cần popup xác nhận: "Bạn có chắc chắn muốn xóa quỹ không?"
+
+**Response:**
+```json
+{
+  "message": "Xóa quỹ thành công"
+}
+```
+
+---
+
+### 7. Thêm thành viên vào quỹ nhóm
+**POST** `/funds/{fundId}/members`
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Request Body:**
+```json
+{
+  "email": "friend@example.com"
+}
+```
+
+**Lưu ý:**
+- Chỉ chủ quỹ có quyền thêm thành viên
+- Thành viên được thêm sẽ có quyền "member" (xem, góp tiền, chỉnh sửa dữ liệu nhưng cần chủ quỹ xác nhận)
+
+**Response:**
+```json
+{
+  "message": "Thêm thành viên thành công",
+  "member": {
+    "memberId": 1,
+    "userId": 2,
+    "fullName": "Người bạn",
+    "email": "friend@example.com",
+    "role": "MEMBER",
+    "status": "ACTIVE"
+  }
+}
+```
+
+---
+
+### 8. Xóa thành viên khỏi quỹ nhóm
+**DELETE** `/funds/{fundId}/members/{memberId}`
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Mô tả:** Xóa thành viên khỏi quỹ nhóm. Chỉ chủ quỹ có quyền xóa thành viên. Cần popup xác nhận: "Bạn có chắc chắn muốn xóa thành viên không?"
+
+**Response:**
+```json
+{
+  "message": "Xóa thành viên thành công"
+}
+```
+
+**Lưu ý:**
+- Không có đổi quyền thành viên vì khi thành viên được thêm vào quỹ chỉ có duy nhất 1 quyền là "member"
+
+---
+
+## 📁 File Upload APIs
+
+### 1. Upload ảnh hóa đơn
+**POST** `/files/upload`
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Request:**
+- Content-Type: `multipart/form-data`
+- Body: FormData với field `file` (File object)
+
+**Lưu ý:**
+- Chỉ chấp nhận file ảnh: JPEG, PNG, GIF, WEBP
+- Kích thước tối đa: **50MB**
+- File sẽ được lưu trong thư mục `uploads/` trên server
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Upload ảnh thành công",
+  "fileUrl": "http://localhost:8080/files/uploads/user_1/invoice_1234567890.jpg"
+}
+```
+
+**Error Response:**
+```json
+{
+  "success": false,
+  "error": "File phải là ảnh hợp lệ (JPEG, PNG, GIF, WEBP)"
+}
+```
+hoặc
+```json
+{
+  "success": false,
+  "error": "Kích thước file không được vượt quá 50MB"
+}
+```
+
+---
+
+### 2. Xóa ảnh
+**DELETE** `/files/delete?fileUrl={encoded_file_url}`
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Query Parameters:**
+- `fileUrl` (required): URL của file cần xóa (phải được encode bằng `encodeURIComponent`)
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Xóa ảnh thành công"
+}
+```
+
+**Error Response:**
+```json
+{
+  "success": false,
+  "error": "Không tìm thấy file hoặc không thể xóa"
+}
+```
+
+**Ví dụ sử dụng:**
+```javascript
+// Upload ảnh
+const fileInput = document.querySelector('input[type="file"]');
+const file = fileInput.files[0];
+const uploadResult = await fileAPI.uploadImage(file);
+const imageUrl = uploadResult.fileUrl;
+
+// Sử dụng imageUrl khi tạo giao dịch
+await transactionAPI.createExpense(walletId, categoryId, amount, date, note, imageUrl);
+
+// Hoặc sử dụng helper function để upload và tạo giao dịch trong một lần
+await transactionAPI.createExpenseWithImage(walletId, categoryId, amount, date, note, file);
 ```
 
 ---

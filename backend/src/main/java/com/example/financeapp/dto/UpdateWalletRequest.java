@@ -31,4 +31,16 @@ public class UpdateWalletRequest {
 
     // Cho phép chuyển đổi loại ví: PERSONAL -> GROUP (không cho phép GROUP -> PERSONAL)
     private String walletType; // "PERSONAL" hoặc "GROUP"
+
+    /**
+     * Danh sách email của các thành viên muốn thêm vào ví khi sửa
+     * Thành viên được thêm sẽ có quyền mặc định theo defaultMemberRole
+     */
+    private java.util.List<String> memberEmails;
+
+    /**
+     * Quyền mặc định cho các thành viên được thêm (mặc định là "MEMBER")
+     * Các giá trị hợp lệ: "MEMBER" (có thể xem và tạo giao dịch)
+     */
+    private String defaultMemberRole = "MEMBER";
 }

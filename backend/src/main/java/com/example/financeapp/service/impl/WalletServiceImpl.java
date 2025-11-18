@@ -71,8 +71,52 @@ public class WalletServiceImpl implements WalletService {
 
         Wallet savedWallet = walletRepository.save(wallet);
 
+        // Thêm owner vào WalletMember
         WalletMember ownerMember = new WalletMember(savedWallet, user, WalletRole.OWNER);
         walletMemberRepository.save(ownerMember);
+
+        // Thêm các thành viên nếu có
+        if (request.getMemberEmails() != null && !request.getMemberEmails().isEmpty()) {
+            String defaultRole = request.getDefaultMemberRole() != null 
+                    ? request.getDefaultMemberRole().toUpperCase() 
+                    : "MEMBER";
+            
+            // Validate role
+            if (!"MEMBER".equals(defaultRole)) {
+                throw new RuntimeException("Quyền mặc định không hợp lệ. Chỉ chấp nhận MEMBER.");
+            }
+
+            WalletRole memberRole = WalletRole.MEMBER;
+
+            for (String memberEmail : request.getMemberEmails()) {
+                if (memberEmail == null || memberEmail.trim().isEmpty()) {
+                    continue; // Bỏ qua email rỗng
+                }
+
+                memberEmail = memberEmail.trim().toLowerCase();
+
+                // Không thể thêm chính mình
+                if (memberEmail.equals(user.getEmail().toLowerCase())) {
+                    continue; // Bỏ qua email của owner
+                }
+
+                // Tìm user theo email
+                User memberUser = userRepository.findByEmail(memberEmail)
+                        .orElse(null);
+
+                if (memberUser == null) {
+                    // User chưa tồn tại, bỏ qua (hoặc có thể throw exception)
+                    continue;
+                }
+
+                // Kiểm tra xem đã là member chưa
+                if (!walletMemberRepository.existsByWallet_WalletIdAndUser_UserId(
+                        savedWallet.getWalletId(), memberUser.getUserId())) {
+                    WalletMember newMember = new WalletMember(savedWallet, memberUser, memberRole);
+                    walletMemberRepository.save(newMember);
+                }
+            }
+        }
 
         return savedWallet;
     }
@@ -98,7 +142,8 @@ public class WalletServiceImpl implements WalletService {
             throw new RuntimeException("Bạn không có quyền truy cập ví này");
         }
 
-        return walletRepository.findById(walletId)
+        // Sử dụng findByWalletIdAndUser_UserId để tự động filter isDeleted = false
+        return walletRepository.findByWalletIdAndUser_UserId(walletId, userId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy ví"));
     }
 
@@ -112,6 +157,11 @@ public class WalletServiceImpl implements WalletService {
         for (WalletMember membership : memberships) {
 
             Wallet wallet = membership.getWallet();
+            
+            // Filter ví đã bị xóa
+            if (wallet.isDeleted()) {
+                continue;
+            }
             WalletMember owner = walletMemberRepository
                     .findByWallet_WalletIdAndRole(wallet.getWalletId(), WalletRole.OWNER)
                     .orElse(null);
@@ -146,7 +196,7 @@ public class WalletServiceImpl implements WalletService {
     @Transactional
     public WalletMemberDTO shareWallet(Long walletId, Long ownerId, String memberEmail) {
 
-        Wallet wallet = walletRepository.findById(walletId)
+        Wallet wallet = walletRepository.findByIdNotDeleted(walletId)
                 .orElseThrow(() -> new RuntimeException("Ví không tồn tại"));
 
         if (!isOwner(walletId, ownerId)) {
@@ -209,12 +259,23 @@ public class WalletServiceImpl implements WalletService {
         // ❗ ĐÂY LÀ KHAI BÁO BIẾN "wallet" MÀ BẠN BỊ THIẾU
         // Khai báo biến 'wallet' ngay đầu scope của phương thức
         // Bằng cách lấy nó từ repository
-        Wallet wallet = walletRepository.findById(walletId)
+        // Sử dụng findByWalletIdAndUser_UserId để tự động filter isDeleted = false
+        Wallet wallet = walletRepository.findByWalletIdAndUser_UserId(walletId, userId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy ví"));
 
-        // Bây giờ bạn có thể sử dụng biến "wallet"
-        if (!wallet.getUser().getUserId().equals(userId)) {
-            throw new RuntimeException("Bạn không có quyền chỉnh sửa ví này");
+        // Kiểm tra quyền chỉnh sửa ví
+        // Đối với ví cá nhân (PERSONAL): chỉ owner (user_id) mới được sửa
+        // Đối với ví nhóm (GROUP): chỉ owner (trong WalletMember với role OWNER) mới được sửa
+        if ("GROUP".equals(wallet.getWalletType())) {
+            // Ví nhóm: kiểm tra quyền owner thông qua WalletMember
+            if (!isOwner(walletId, userId)) {
+                throw new RuntimeException("Bạn không có quyền chỉnh sửa ví nhóm này. Chỉ chủ sở hữu mới có quyền sửa.");
+            }
+        } else {
+            // Ví cá nhân: kiểm tra quyền owner thông qua user_id
+            if (!wallet.getUser().getUserId().equals(userId)) {
+                throw new RuntimeException("Bạn không có quyền chỉnh sửa ví này");
+            }
         }
 
         // Logic cũ của bạn (cập nhật balance)
@@ -422,6 +483,50 @@ public class WalletServiceImpl implements WalletService {
             // (hoặc có thể cho phép giữ nguyên)
         }
 
+        // Thêm các thành viên mới nếu có
+        if (request.getMemberEmails() != null && !request.getMemberEmails().isEmpty()) {
+            String defaultRole = request.getDefaultMemberRole() != null 
+                    ? request.getDefaultMemberRole().toUpperCase() 
+                    : "MEMBER";
+            
+            // Validate role
+            if (!"MEMBER".equals(defaultRole)) {
+                throw new RuntimeException("Quyền mặc định không hợp lệ. Chỉ chấp nhận MEMBER.");
+            }
+
+            WalletRole memberRole = WalletRole.MEMBER;
+            User owner = wallet.getUser();
+
+            for (String memberEmail : request.getMemberEmails()) {
+                if (memberEmail == null || memberEmail.trim().isEmpty()) {
+                    continue; // Bỏ qua email rỗng
+                }
+
+                memberEmail = memberEmail.trim().toLowerCase();
+
+                // Không thể thêm chính mình
+                if (memberEmail.equals(owner.getEmail().toLowerCase())) {
+                    continue; // Bỏ qua email của owner
+                }
+
+                // Tìm user theo email
+                User memberUser = userRepository.findByEmail(memberEmail)
+                        .orElse(null);
+
+                if (memberUser == null) {
+                    // User chưa tồn tại, bỏ qua (hoặc có thể throw exception)
+                    continue;
+                }
+
+                // Kiểm tra xem đã là member chưa
+                if (!walletMemberRepository.existsByWallet_WalletIdAndUser_UserId(
+                        walletId, memberUser.getUserId())) {
+                    WalletMember newMember = new WalletMember(wallet, memberUser, memberRole);
+                    walletMemberRepository.save(newMember);
+                }
+            }
+        }
+
         return walletRepository.save(wallet);
     }
     // ---------------- LEAVE WALLET ----------------
@@ -459,8 +564,8 @@ public class WalletServiceImpl implements WalletService {
             throw new RuntimeException("Bạn không có quyền gộp ví này");
         }
 
-        // Kiểm tra ví nguồn tồn tại
-        if (!walletRepository.existsById(sourceWalletId)) {
+        // Kiểm tra ví nguồn tồn tại (chưa bị xóa)
+        if (!walletRepository.findByIdNotDeleted(sourceWalletId).isPresent()) {
             throw new RuntimeException("Ví nguồn không tồn tại");
         }
 
@@ -516,10 +621,10 @@ public class WalletServiceImpl implements WalletService {
             throw new RuntimeException("Không thể gộp ví với chính nó");
         }
 
-        Wallet sourceWallet = walletRepository.findById(sourceWalletId)
+        Wallet sourceWallet = walletRepository.findByIdNotDeleted(sourceWalletId)
                 .orElseThrow(() -> new RuntimeException("Ví nguồn không tồn tại"));
 
-        Wallet targetWallet = walletRepository.findById(targetWalletId)
+        Wallet targetWallet = walletRepository.findByIdNotDeleted(targetWalletId)
                 .orElseThrow(() -> new RuntimeException("Ví đích không tồn tại"));
 
         // Validate currency
@@ -593,7 +698,7 @@ public class WalletServiceImpl implements WalletService {
 
     @Override
     @Transactional
-    public MergeWalletResponse mergeWallets(Long userId, Long sourceWalletId, Long targetWalletId, String targetCurrency) {
+    public MergeWalletResponse mergeWallets(Long userId, Long sourceWalletId, Long targetWalletId, String targetCurrency, Boolean transferDefaultFlag) {
         long startTime = System.currentTimeMillis();
 
         // Kiểm tra quyền sở hữu
@@ -653,10 +758,21 @@ public class WalletServiceImpl implements WalletService {
         targetWallet.setCurrencyCode(targetCurrency);
         targetWallet.setBalance(sourceBalanceConverted.add(targetBalanceConverted));
 
-        // Nếu source wallet là default, chuyển sang target wallet
+        // Xử lý ví mặc định theo lựa chọn của người dùng
         if (wasSourceDefault) {
-            walletRepository.unsetDefaultWallet(userId, targetWalletId);
-            targetWallet.setDefault(true);
+            // Nếu transferDefaultFlag = null (không truyền), mặc định là true (giữ hành vi cũ)
+            boolean shouldTransfer = transferDefaultFlag == null || transferDefaultFlag;
+            
+            if (shouldTransfer) {
+                // Chuyển ví mặc định sang ví đích
+                walletRepository.unsetDefaultWallet(userId, targetWalletId);
+                targetWallet.setDefault(true);
+            } else {
+                // Hủy bỏ ví mặc định (không có ví mặc định)
+                targetWallet.setDefault(false);
+                // Đảm bảo không còn ví nào là mặc định
+                walletRepository.unsetDefaultWallet(userId, null);
+            }
         }
 
         walletRepository.save(targetWallet);
@@ -789,9 +905,14 @@ public class WalletServiceImpl implements WalletService {
     @Transactional // Đảm bảo có @Transactional
     public DeleteWalletResponse deleteWallet(Long userId, Long walletId) {
 
-        // 1. Tìm ví
-        Wallet wallet = walletRepository.findById(walletId)
+        // 1. Tìm ví (bao gồm cả ví đã bị xóa để kiểm tra)
+        Wallet wallet = walletRepository.findByIdIncludingDeleted(walletId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy ví"));
+        
+        // Kiểm tra nếu ví đã bị xóa
+        if (wallet.isDeleted()) {
+            throw new RuntimeException("Ví này đã bị xóa");
+        }
 
         // 2. Kiểm tra quyền sở hữu
         if (!isOwner(walletId, userId)) {
@@ -817,8 +938,10 @@ public class WalletServiceImpl implements WalletService {
         int membersRemoved = members.size();
         walletMemberRepository.deleteAll(members);
 
-        // 6. Xóa ví
-        walletRepository.delete(wallet);
+        // 6. Soft delete ví (thay vì hard delete)
+        wallet.setDeleted(true);
+        wallet.setDeletedAt(LocalDateTime.now());
+        walletRepository.save(wallet);
 
         // 7. Trả về thông tin
         DeleteWalletResponse response = new DeleteWalletResponse(

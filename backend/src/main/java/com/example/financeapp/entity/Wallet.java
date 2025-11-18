@@ -44,6 +44,14 @@ public class Wallet {
     @Column(name = "wallet_type", length = 20)
     private String walletType = "PERSONAL"; // PERSONAL hoặc GROUP
 
+    // Soft delete fields
+    @Column(name = "is_deleted", nullable = false)
+    @JsonProperty("isDeleted")
+    private boolean isDeleted = false;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
     @PreUpdate
     public void preUpdate() {
         this.updatedAt = LocalDateTime.now();
@@ -129,5 +137,24 @@ public class Wallet {
 
     public void setWalletType(String walletType) {
         this.walletType = walletType;
+    }
+
+    public boolean isDeleted() {
+        return isDeleted;
+    }
+
+    public void setDeleted(boolean deleted) {
+        isDeleted = deleted;
+        if (deleted && deletedAt == null) {
+            deletedAt = LocalDateTime.now();
+        }
+    }
+
+    public LocalDateTime getDeletedAt() {
+        return deletedAt;
+    }
+
+    public void setDeletedAt(LocalDateTime deletedAt) {
+        this.deletedAt = deletedAt;
     }
 }
