@@ -25,17 +25,8 @@ public class ExchangeRateServiceImpl implements ExchangeRateService {
         // Tỷ giá tham khảo (1 VND = ?)
         EXCHANGE_RATES.put("VND", BigDecimal.ONE); // 1 VND = 1 VND
         EXCHANGE_RATES.put("USD", new BigDecimal("0.000041")); // 1 VND = 0.000041 USD
-        EXCHANGE_RATES.put("EUR", new BigDecimal("0.000038")); // 1 VND = 0.000038 EUR
-        EXCHANGE_RATES.put("JPY", new BigDecimal("0.0063")); // 1 VND = 0.0063 JPY
-        EXCHANGE_RATES.put("GBP", new BigDecimal("0.000032")); // 1 VND = 0.000032 GBP
-        EXCHANGE_RATES.put("CNY", new BigDecimal("0.00030")); // 1 VND = 0.0003 CNY
-        
-        // Hoặc tính theo chiều ngược (1 Currency = ? VND)
-        // USD: 1 USD = 24,350 VND
-        // EUR: 1 EUR = 26,315 VND
-        // JPY: 1 JPY = 158 VND
-        // GBP: 1 GBP = 31,250 VND
-        // CNY: 1 CNY = 3,333 VND
+
+
     }
 
     @Override

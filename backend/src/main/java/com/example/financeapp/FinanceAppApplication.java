@@ -7,7 +7,7 @@ import jakarta.annotation.PostConstruct;
 import java.util.TimeZone;
 
 @SpringBootApplication
-public class  FinanceAppApplication {
+public class    FinanceAppApplication {
 
     @PostConstruct
     public void init() {
