@@ -58,4 +58,18 @@ public interface BudgetRepository extends JpaRepository<Budget, Long> {
             @Param("newStartDate") LocalDate newStartDate,
             @Param("newEndDate") LocalDate newEndDate
     );
+
+    @Query("""
+            SELECT b FROM Budget b
+            WHERE b.user.userId = :userId
+              AND b.category.categoryId = :categoryId
+              AND b.startDate <= :targetDate
+              AND b.endDate >= :targetDate
+              AND (:walletId IS NULL OR b.wallet IS NULL OR b.wallet.walletId = :walletId)
+            ORDER BY CASE WHEN b.wallet IS NULL THEN 1 ELSE 0 END
+            """)
+    List<Budget> findApplicableBudgets(@Param("userId") Long userId,
+                                       @Param("categoryId") Long categoryId,
+                                       @Param("walletId") Long walletId,
+                                       @Param("targetDate") LocalDate targetDate);
 }

@@ -835,6 +835,9 @@ hoặc
       "remainingAmount": 3800000,
       "progressPercentage": 24.00,
       "overLimit": false,
+      "overBudgetAmount": 0,
+      "hasExceededBudget": false,
+      "budgetStatus": "ACTIVE",
       "warningTriggered": false,
       "overLimitAlertTriggered": false,
       "warningThresholdPercent": 20,
@@ -851,6 +854,7 @@ hoặc
 - `remainingAmount` có thể âm nếu đã chi quá ngân sách.
 - `appliesToAllWallets = true` nghĩa là ngân sách áp dụng cho mọi ví của bạn.
 - Khi `warningTriggered = true`, hệ thống đã gửi email cảnh báo (mặc định khi còn ≤20%). Khi `overLimitAlertTriggered = true`, bạn đã vượt hạn mức và đã nhận email thông báo.
+- `budgetStatus` có thể là `ACTIVE`, `OVER_LIMIT`, `COMPLETED`. `overBudgetAmount` thể hiện số tiền vượt hạn mức; `hasExceededBudget = true` nghĩa là ngân sách này đang âm.
 
 ---
 
@@ -1116,11 +1120,14 @@ hoặc
     "transactionDate": "2024-01-01T10:00:00",
     "note": "Ăn trưa",
     "imageUrl": "optional_image_url",
+    "overBudget": true,
+    "overBudgetAmount": 500000,
     "wallet": {
       "walletId": 1,
       "balance": 950000.00
     }
-  }
+  },
+  "budgetAlert": "Ngân sách Ăn uống đã vượt hạn mức 500000"
 }
 ```
 

@@ -15,6 +15,9 @@ public class BudgetSummaryResponse {
     private BigDecimal remainingAmount;
     private BigDecimal progressPercentage;
     private boolean overLimit;
+    private BigDecimal overBudgetAmount;
+    private boolean hasExceededBudget;
+    private String budgetStatus;
     private boolean warningTriggered;
     private boolean overLimitAlertTriggered;
     private BigDecimal warningThresholdPercent;
@@ -108,6 +111,30 @@ public class BudgetSummaryResponse {
 
     public void setOverLimit(boolean overLimit) {
         this.overLimit = overLimit;
+    }
+
+    public BigDecimal getOverBudgetAmount() {
+        return overBudgetAmount;
+    }
+
+    public void setOverBudgetAmount(BigDecimal overBudgetAmount) {
+        this.overBudgetAmount = overBudgetAmount;
+    }
+
+    public boolean isHasExceededBudget() {
+        return hasExceededBudget;
+    }
+
+    public void setHasExceededBudget(boolean hasExceededBudget) {
+        this.hasExceededBudget = hasExceededBudget;
+    }
+
+    public String getBudgetStatus() {
+        return budgetStatus;
+    }
+
+    public void setBudgetStatus(String budgetStatus) {
+        this.budgetStatus = budgetStatus;
     }
 
     public boolean isWarningTriggered() {

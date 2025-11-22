@@ -12,4 +12,5 @@ public interface BudgetService {
     Budget createBudget(@NonNull Long userId, CreateBudgetRequest request);
     List<BudgetSummaryResponse> getBudgets(@NonNull Long userId);
     List<Transaction> getBudgetTransactions(@NonNull Long userId, Long budgetId);
+    void handleExpenseTransaction(Transaction transaction);
 }

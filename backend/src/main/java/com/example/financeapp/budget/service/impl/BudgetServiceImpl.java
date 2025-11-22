@@ -3,6 +3,7 @@ package com.example.financeapp.budget.service.impl;
 import com.example.financeapp.budget.dto.BudgetSummaryResponse;
 import com.example.financeapp.budget.dto.CreateBudgetRequest;
 import com.example.financeapp.budget.entity.Budget;
+import com.example.financeapp.budget.entity.Budget.BudgetStatus;
 import com.example.financeapp.budget.repository.BudgetRepository;
 import com.example.financeapp.budget.service.BudgetService;
 import com.example.financeapp.category.entity.Category;
@@ -22,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
@@ -155,6 +157,68 @@ public class BudgetServiceImpl implements BudgetService {
         );
     }
 
+    @Override
+    @Transactional
+    public void handleExpenseTransaction(Transaction transaction) {
+        if (transaction == null || transaction.getTransactionDate() == null || transaction.getCategory() == null) {
+            return;
+        }
+
+        Long userId = transaction.getUser() != null ? transaction.getUser().getUserId() : null;
+        if (userId == null) {
+            return;
+        }
+
+        Long walletId = transaction.getWallet() != null ? transaction.getWallet().getWalletId() : null;
+        Long categoryId = transaction.getCategory().getCategoryId();
+        if (categoryId == null) {
+            return;
+        }
+
+        LocalDate targetDate = transaction.getTransactionDate().toLocalDate();
+
+        List<Budget> budgets = budgetRepository.findApplicableBudgets(userId, categoryId, walletId, targetDate);
+        if (budgets.isEmpty()) {
+            return;
+        }
+
+        Budget budget = budgets.get(0);
+        Long budgetWalletId = budget.getWallet() != null ? budget.getWallet().getWalletId() : null;
+
+        BigDecimal spent = transactionRepository.sumExpensesForBudget(
+                userId,
+                budget.getCategory().getCategoryId(),
+                budgetWalletId,
+                budget.getStartDate().atStartOfDay(),
+                budget.getEndDate().atTime(LocalTime.MAX)
+        );
+
+        if (spent == null) {
+            spent = BigDecimal.ZERO;
+        }
+
+        BigDecimal amountLimit = budget.getAmountLimit() != null ? budget.getAmountLimit() : BigDecimal.ZERO;
+        BigDecimal remaining = amountLimit.subtract(spent);
+        BigDecimal overBudgetAmount = spent.subtract(amountLimit);
+
+        boolean exceeded = overBudgetAmount.compareTo(BigDecimal.ZERO) > 0;
+        BigDecimal normalizedOverAmount = exceeded ? overBudgetAmount : BigDecimal.ZERO;
+
+        transaction.setBudget(budget);
+        transaction.setOverBudget(exceeded);
+        transaction.setOverBudgetAmount(normalizedOverAmount);
+        transactionRepository.save(transaction);
+
+        budget.setOverBudgetAmount(normalizedOverAmount);
+        BudgetStatus status = determineBudgetStatus(budget, normalizedOverAmount);
+        if (budget.getStatus() != status) {
+            budget.setStatus(status);
+        }
+
+        handleBudgetAlerts(budget, amountLimit, spent, remaining);
+        budgetRepository.save(budget);
+    }
+
     private BudgetSummaryResponse buildBudgetSummary(Budget budget, Long userId) {
         Long walletId = budget.getWallet() != null ? budget.getWallet().getWalletId() : null;
 
@@ -183,6 +247,17 @@ public class BudgetServiceImpl implements BudgetService {
                     .divide(amountLimit, 2, RoundingMode.HALF_UP);
         }
 
+        BigDecimal overBudgetAmount = spent.subtract(amountLimit);
+        if (overBudgetAmount.compareTo(BigDecimal.ZERO) < 0) {
+            overBudgetAmount = BigDecimal.ZERO;
+        }
+
+        BudgetStatus status = determineBudgetStatus(budget, overBudgetAmount);
+        if (budget.getStatus() != status) {
+            budget.setStatus(status);
+            budgetRepository.save(budget);
+        }
+
         AlertInfo alertInfo = handleBudgetAlerts(budget, amountLimit, spent, remaining);
 
         BudgetSummaryResponse response = new BudgetSummaryResponse();
@@ -194,6 +269,9 @@ public class BudgetServiceImpl implements BudgetService {
         response.setRemainingAmount(remaining);
         response.setProgressPercentage(progress);
         response.setOverLimit(remaining.compareTo(BigDecimal.ZERO) < 0);
+        response.setOverBudgetAmount(overBudgetAmount);
+        response.setHasExceededBudget(overBudgetAmount.compareTo(BigDecimal.ZERO) > 0);
+        response.setBudgetStatus(status.name());
         response.setWarningTriggered(alertInfo.warningTriggered());
         response.setOverLimitAlertTriggered(alertInfo.overLimitTriggered());
         response.setWarningThresholdPercent(alertInfo.thresholdPercent());
@@ -274,6 +352,16 @@ public class BudgetServiceImpl implements BudgetService {
                 spent,
                 amountLimit
         );
+    }
+
+    private BudgetStatus determineBudgetStatus(Budget budget, BigDecimal overBudgetAmount) {
+        if (overBudgetAmount != null && overBudgetAmount.compareTo(BigDecimal.ZERO) > 0) {
+            return BudgetStatus.OVER_LIMIT;
+        }
+        if (budget.getEndDate() != null && budget.getEndDate().isBefore(LocalDate.now())) {
+            return BudgetStatus.COMPLETED;
+        }
+        return BudgetStatus.ACTIVE;
     }
 
     private record AlertInfo(boolean warningTriggered, boolean overLimitTriggered,

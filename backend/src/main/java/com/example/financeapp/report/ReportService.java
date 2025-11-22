@@ -27,7 +27,7 @@ public class ReportService {
 
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
     private static final String[] HEADERS = {
-            "Ngày giao dịch", "Loại", "Danh mục", "Ví", "Số tiền", "Ghi chú"
+            "Ngày giao dịch", "Loại", "Danh mục", "Ví", "Số tiền", "Ghi chú", "Vượt hạn mức"
     };
 
     public ReportFile generateTransactionReport(List<Transaction> transactions, ReportFormat format) {
@@ -56,6 +56,7 @@ public class ReportService {
                 row.createCell(3).setCellValue(tx.getWallet() != null ? tx.getWallet().getWalletName() : "");
                 row.createCell(4).setCellValue(formatAmount(tx.getAmount()));
                 row.createCell(5).setCellValue(tx.getNote() != null ? tx.getNote() : "");
+                row.createCell(6).setCellValue(formatOverBudget(tx));
             }
 
             for (int i = 0; i < HEADERS.length; i++) {
@@ -98,6 +99,7 @@ public class ReportService {
                 table.addCell(tx.getWallet() != null ? tx.getWallet().getWalletName() : "");
                 table.addCell(formatAmount(tx.getAmount()));
                 table.addCell(tx.getNote() != null ? tx.getNote() : "");
+                table.addCell(formatOverBudget(tx));
             }
 
             document.add(table);
@@ -120,6 +122,18 @@ public class ReportService {
     private String formatAmount(BigDecimal amount) {
         if (amount == null) return "0";
         return amount.stripTrailingZeros().toPlainString();
+    }
+
+    private String formatOverBudget(Transaction transaction) {
+        if (transaction == null || !transaction.isOverBudget()) {
+            return "";
+        }
+        BigDecimal exceed = transaction.getOverBudgetAmount() != null
+                ? transaction.getOverBudgetAmount()
+                : BigDecimal.ZERO;
+        return exceed.compareTo(BigDecimal.ZERO) > 0
+                ? "⚠️ +" + exceed.stripTrailingZeros().toPlainString()
+                : "⚠️";
     }
 
     private String buildFileName(String extension) {

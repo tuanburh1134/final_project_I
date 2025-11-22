@@ -56,6 +56,13 @@ public class Budget {
     @Column(name = "over_limit_alert_sent")
     private boolean overLimitAlertSent = false;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", length = 20)
+    private BudgetStatus status = BudgetStatus.ACTIVE;
+
+    @Column(name = "over_budget_amount", precision = 20, scale = 8)
+    private BigDecimal overBudgetAmount = BigDecimal.ZERO;
+
     @PreUpdate
     public void preUpdate() {
         this.updatedAt = LocalDateTime.now();
@@ -114,5 +121,27 @@ public class Budget {
 
     public void setOverLimitAlertSent(boolean overLimitAlertSent) {
         this.overLimitAlertSent = overLimitAlertSent;
+    }
+
+    public BudgetStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(BudgetStatus status) {
+        this.status = status;
+    }
+
+    public BigDecimal getOverBudgetAmount() {
+        return overBudgetAmount;
+    }
+
+    public void setOverBudgetAmount(BigDecimal overBudgetAmount) {
+        this.overBudgetAmount = overBudgetAmount;
+    }
+
+    public enum BudgetStatus {
+        ACTIVE,
+        OVER_LIMIT,
+        COMPLETED
     }
 }

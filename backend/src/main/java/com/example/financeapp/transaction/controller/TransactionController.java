@@ -12,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -38,6 +39,7 @@ public class TransactionController {
             Transaction tx = transactionService.createExpense(getCurrentUserId(), request);
             res.put("message", "Thêm chi tiêu thành công");
             res.put("transaction", tx);
+            attachBudgetAlert(res, tx);
             return ResponseEntity.ok(res);
         } catch (Exception e) {
             res.put("error", e.getMessage());
@@ -52,6 +54,7 @@ public class TransactionController {
             Transaction tx = transactionService.createIncome(getCurrentUserId(), request);
             res.put("message", "Thêm thu nhập thành công");
             res.put("transaction", tx);
+            attachBudgetAlert(res, tx);
             return ResponseEntity.ok(res);
         } catch (Exception e) {
             res.put("error", e.getMessage());
@@ -108,5 +111,17 @@ public class TransactionController {
             res.put("error", e.getMessage());
             return ResponseEntity.status(500).body(res);
         }
+    }
+
+    private void attachBudgetAlert(Map<String, Object> res, Transaction tx) {
+        if (tx == null || !tx.isOverBudget()) {
+            return;
+        }
+        BigDecimal exceed = tx.getOverBudgetAmount() != null ? tx.getOverBudgetAmount() : BigDecimal.ZERO;
+        String budgetName = tx.getBudget() != null && tx.getBudget().getCategory() != null
+                ? tx.getBudget().getCategory().getCategoryName()
+                : "ngân sách";
+        res.put("budgetAlert", String.format("Ngân sách %s đã vượt hạn mức %s", budgetName, exceed));
+        res.put("overBudgetAmount", exceed);
     }
 }

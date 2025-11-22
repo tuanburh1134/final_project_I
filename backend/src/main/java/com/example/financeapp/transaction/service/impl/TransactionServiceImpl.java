@@ -1,5 +1,6 @@
 package com.example.financeapp.transaction.service.impl;
 
+import com.example.financeapp.budget.service.BudgetService;
 import com.example.financeapp.category.entity.Category;
 import com.example.financeapp.category.repository.CategoryRepository;
 import com.example.financeapp.transaction.dto.CreateTransactionRequest;
@@ -34,6 +35,7 @@ public class TransactionServiceImpl implements TransactionService {
     @Autowired private TransactionTypeRepository typeRepository;
     @Autowired private CategoryRepository categoryRepository;
     @Autowired private WalletMemberRepository walletMemberRepository;
+    @Autowired private BudgetService budgetService;
 
     private Transaction createTransaction(Long userId, CreateTransactionRequest req, String typeName) {
         // 1. Kiểm tra user tồn tại
@@ -108,7 +110,13 @@ public class TransactionServiceImpl implements TransactionService {
         tx.setNote(req.getNote());
         tx.setImageUrl(req.getImageUrl());
 
-        return transactionRepository.save(tx);
+        Transaction savedTransaction = transactionRepository.save(tx);
+
+        if ("Chi tiêu".equals(typeName)) {
+            budgetService.handleExpenseTransaction(savedTransaction);
+        }
+
+        return savedTransaction;
     }
 
     @Override
