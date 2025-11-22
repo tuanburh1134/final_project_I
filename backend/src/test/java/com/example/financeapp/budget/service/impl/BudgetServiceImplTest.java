@@ -1,5 +1,6 @@
 package com.example.financeapp.budget.service.impl;
 
+import com.example.financeapp.budget.dto.BudgetAlert;
 import com.example.financeapp.budget.dto.BudgetSummaryResponse;
 import com.example.financeapp.budget.entity.Budget;
 import com.example.financeapp.budget.entity.Budget.BudgetStatus;
@@ -91,7 +92,7 @@ class BudgetServiceImplTest {
         when(transactionRepository.save(any(Transaction.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
-        budgetService.handleExpenseTransaction(transaction);
+        BudgetAlert alert = budgetService.handleExpenseTransaction(transaction);
 
         ArgumentCaptor<Transaction> txCaptor = ArgumentCaptor.forClass(Transaction.class);
         verify(transactionRepository, atLeastOnce()).save(txCaptor.capture());
@@ -104,6 +105,9 @@ class BudgetServiceImplTest {
         assertThat(budget.getOverBudgetAmount()).isEqualByComparingTo("500000");
         verify(emailService).sendBudgetExceededEmail(eq("user@example.com"), eq("Ăn uống"),
                 eq(BigDecimal.valueOf(5_500_000)), eq(BigDecimal.valueOf(5_000_000)));
+        assertThat(alert).isNotNull();
+        assertThat(alert.getLevel()).isEqualTo("OVER_LIMIT");
+        assertThat(alert.getOverBudgetAmount()).isEqualByComparingTo("500000");
     }
 
     @Test

@@ -505,11 +505,55 @@ export const scheduledTransactionAPI = {
     return apiCall('/scheduled-transactions');
   },
 
+  getLogs: async (scheduleId) => {
+    return apiCall(`/scheduled-transactions/${scheduleId}/logs`);
+  },
+
   cancelSchedule: async (scheduleId) => {
     return apiCall(`/scheduled-transactions/${scheduleId}`, {
       method: 'DELETE',
     });
   },
+};
+
+// ==================== FUND / SAVINGS GOAL APIs ====================
+
+export const fundAPI = {
+  createFund: async (payload) => {
+    return apiCall('/funds', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  getDashboard: async () => apiCall('/funds/dashboard'),
+
+  getDetail: async (fundId) => apiCall(`/funds/${fundId}`),
+};
+
+// ==================== BACKUP APIs ====================
+
+export const backupAPI = {
+  backupNow: async () => {
+    return apiCall('/backup/me', {
+      method: 'POST',
+    });
+  },
+
+  getStatus: async () => apiCall('/backup/status'),
+};
+
+// ==================== FEEDBACK APIs ====================
+
+export const feedbackAPI = {
+  submitFeedback: async (payload) => {
+    return apiCall('/feedback', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  getMyFeedback: async () => apiCall('/feedback'),
 };
 
 function getFileNameFromDisposition(disposition) {
@@ -603,6 +647,19 @@ export const transactionAPI = {
   },
 };
 
+// ==================== DAILY REMINDER APIs ====================
+
+export const reminderAPI = {
+  getReminder: async () => apiCall('/reminders'),
+
+  upsertReminder: async ({ reminderTime, sendEmail = true, sendPush = false, enabled = true }) => {
+    return apiCall('/reminders', {
+      method: 'POST',
+      body: JSON.stringify({ reminderTime, sendEmail, sendPush, enabled }),
+    });
+  },
+};
+
 // ==================== EXPORT ALL APIs ====================
 
 export default {
@@ -612,6 +669,10 @@ export default {
   budget: budgetAPI,
   report: reportAPI,
   scheduledTransaction: scheduledTransactionAPI,
+  fund: fundAPI,
+  backup: backupAPI,
+  feedback: feedbackAPI,
+  reminder: reminderAPI,
   category: categoryAPI,
   transaction: transactionAPI,
 };

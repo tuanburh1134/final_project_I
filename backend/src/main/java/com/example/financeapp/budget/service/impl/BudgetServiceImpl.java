@@ -1,5 +1,6 @@
 package com.example.financeapp.budget.service.impl;
 
+import com.example.financeapp.budget.dto.BudgetAlert;
 import com.example.financeapp.budget.dto.BudgetSummaryResponse;
 import com.example.financeapp.budget.dto.CreateBudgetRequest;
 import com.example.financeapp.budget.entity.Budget;
@@ -9,6 +10,7 @@ import com.example.financeapp.budget.service.BudgetService;
 import com.example.financeapp.category.entity.Category;
 import com.example.financeapp.category.repository.CategoryRepository;
 import com.example.financeapp.common.service.EmailService;
+import com.example.financeapp.fund.repository.FundRepository;
 import com.example.financeapp.transaction.entity.Transaction;
 import com.example.financeapp.transaction.repository.TransactionRepository;
 import com.example.financeapp.user.entity.User;
@@ -43,6 +45,8 @@ public class BudgetServiceImpl implements BudgetService {
     private WalletRepository walletRepository;
     @Autowired
     private WalletService walletService;
+    @Autowired
+    private FundRepository fundRepository;
     @Autowired
     private TransactionRepository transactionRepository;
     @Autowired
@@ -81,6 +85,10 @@ public class BudgetServiceImpl implements BudgetService {
                 throw new RuntimeException("Bạn không có quyền truy cập ví này");
             }
             walletIdForCheck = wallet.getWalletId();
+
+            if (fundRepository.existsByWallet_WalletId(walletIdForCheck)) {
+                throw new RuntimeException("Ví này đang được sử dụng cho một quỹ tiết kiệm. Vui lòng chọn ví khác.");
+            }
         }
 
         // KIỂM TRA GIAO NHAU (OVERLAP) – CHẶN HOÀN TOÀN
@@ -159,27 +167,27 @@ public class BudgetServiceImpl implements BudgetService {
 
     @Override
     @Transactional
-    public void handleExpenseTransaction(Transaction transaction) {
+    public BudgetAlert handleExpenseTransaction(Transaction transaction) {
         if (transaction == null || transaction.getTransactionDate() == null || transaction.getCategory() == null) {
-            return;
+            return null;
         }
 
         Long userId = transaction.getUser() != null ? transaction.getUser().getUserId() : null;
         if (userId == null) {
-            return;
+            return null;
         }
 
         Long walletId = transaction.getWallet() != null ? transaction.getWallet().getWalletId() : null;
         Long categoryId = transaction.getCategory().getCategoryId();
         if (categoryId == null) {
-            return;
+            return null;
         }
 
         LocalDate targetDate = transaction.getTransactionDate().toLocalDate();
 
         List<Budget> budgets = budgetRepository.findApplicableBudgets(userId, categoryId, walletId, targetDate);
         if (budgets.isEmpty()) {
-            return;
+            return null;
         }
 
         Budget budget = budgets.get(0);
@@ -215,8 +223,10 @@ public class BudgetServiceImpl implements BudgetService {
             budget.setStatus(status);
         }
 
-        handleBudgetAlerts(budget, amountLimit, spent, remaining);
+        AlertInfo alertInfo = handleBudgetAlerts(budget, amountLimit, spent, remaining);
         budgetRepository.save(budget);
+
+        return buildBudgetAlert(budget, alertInfo, normalizedOverAmount, remaining);
     }
 
     private BudgetSummaryResponse buildBudgetSummary(Budget budget, Long userId) {
@@ -362,6 +372,33 @@ public class BudgetServiceImpl implements BudgetService {
             return BudgetStatus.COMPLETED;
         }
         return BudgetStatus.ACTIVE;
+    }
+
+    private BudgetAlert buildBudgetAlert(Budget budget,
+                                                                           AlertInfo alertInfo,
+                                                                           BigDecimal overBudgetAmount,
+                                                                           BigDecimal remaining) {
+        if (alertInfo.overLimitTriggered()) {
+            String message = String.format("Ngân sách %s đã vượt hạn mức %s",
+                    budget.getCategory().getCategoryName(),
+                    overBudgetAmount.stripTrailingZeros().toPlainString());
+            return new BudgetAlert(true, "OVER_LIMIT", message, overBudgetAmount);
+        }
+
+        if (alertInfo.warningTriggered() && remaining != null && remaining.compareTo(BigDecimal.ZERO) >= 0) {
+            String message = String.format("Ngân sách %s chỉ còn %s (<= %s%%)",
+                    budget.getCategory().getCategoryName(),
+                    remaining.stripTrailingZeros().toPlainString(),
+                    defaultThresholdPercent(budget).stripTrailingZeros().toPlainString());
+            return new BudgetAlert(
+                    true,
+                    "WARNING",
+                    message,
+                    BigDecimal.ZERO
+            );
+        }
+
+        return null;
     }
 
     private record AlertInfo(boolean warningTriggered, boolean overLimitTriggered,

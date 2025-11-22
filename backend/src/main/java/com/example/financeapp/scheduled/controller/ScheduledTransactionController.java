@@ -1,6 +1,7 @@
 package com.example.financeapp.scheduled.controller;
 
 import com.example.financeapp.scheduled.dto.CreateScheduledTransactionRequest;
+import com.example.financeapp.scheduled.dto.ScheduledTransactionLogResponse;
 import com.example.financeapp.scheduled.dto.ScheduledTransactionResponse;
 import com.example.financeapp.scheduled.service.ScheduledTransactionService;
 import com.example.financeapp.security.CustomUserDetails;
@@ -52,6 +53,28 @@ public class ScheduledTransactionController {
             List<ScheduledTransactionResponse> schedules = scheduledTransactionService.getSchedules(userId);
             res.put("schedules", schedules);
             res.put("total", schedules.size());
+            return ResponseEntity.ok(res);
+        } catch (RuntimeException e) {
+            res.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(res);
+        } catch (Exception e) {
+            res.put("error", "Lỗi hệ thống: " + e.getMessage());
+            return ResponseEntity.status(500).body(res);
+        }
+    }
+
+    @GetMapping("/{scheduleId}/logs")
+    public ResponseEntity<Map<String, Object>> getScheduleLogs(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long scheduleId
+    ) {
+        Map<String, Object> res = new HashMap<>();
+        try {
+            Long userId = requireUserId(userDetails);
+            List<ScheduledTransactionLogResponse> logs =
+                    scheduledTransactionService.getScheduleLogs(userId, scheduleId);
+            res.put("logs", logs);
+            res.put("total", logs.size());
             return ResponseEntity.ok(res);
         } catch (RuntimeException e) {
             res.put("error", e.getMessage());

@@ -7,6 +7,7 @@ import com.example.financeapp.wallet.entity.Wallet;
 import jakarta.persistence.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -40,18 +41,47 @@ public class ScheduledTransaction {
     @Column(name = "note", length = 500)
     private String note;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "schedule_type", length = 20, nullable = false)
+    private ScheduleType scheduleType = ScheduleType.ONE_TIME;
+
     @Column(name = "schedule_time", nullable = false)
     private LocalDateTime scheduleTime;
+
+    @Column(name = "end_date")
+    private LocalDate endDate;
+
+    /**
+     * Next run that the scheduler should execute.
+     */
+    @Column(name = "next_run_at")
+    private LocalDateTime nextRunAt;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", length = 20, nullable = false)
     private ScheduleStatus status = ScheduleStatus.PENDING;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "last_run_status", length = 20)
+    private ScheduleStatus lastRunStatus;
+
+    /**
+     * Timestamp of the last execution attempt (success or failure).
+     */
     @Column(name = "executed_at")
     private LocalDateTime executedAt;
 
+    /**
+     * Last failure reason, if any.
+     */
     @Column(name = "failure_reason", length = 500)
     private String failureReason;
+
+    @Column(name = "total_success", nullable = false)
+    private int totalSuccess = 0;
+
+    @Column(name = "total_failed", nullable = false)
+    private int totalFailed = 0;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
@@ -70,6 +100,14 @@ public class ScheduledTransaction {
         COMPLETED,
         FAILED,
         CANCELLED
+    }
+
+    public enum ScheduleType {
+        ONE_TIME,
+        DAILY,
+        WEEKLY,
+        MONTHLY,
+        YEARLY
     }
 
     public Long getScheduleId() {
@@ -128,6 +166,14 @@ public class ScheduledTransaction {
         this.note = note;
     }
 
+    public ScheduleType getScheduleType() {
+        return scheduleType;
+    }
+
+    public void setScheduleType(ScheduleType scheduleType) {
+        this.scheduleType = scheduleType;
+    }
+
     public LocalDateTime getScheduleTime() {
         return scheduleTime;
     }
@@ -136,12 +182,36 @@ public class ScheduledTransaction {
         this.scheduleTime = scheduleTime;
     }
 
+    public LocalDate getEndDate() {
+        return endDate;
+    }
+
+    public void setEndDate(LocalDate endDate) {
+        this.endDate = endDate;
+    }
+
+    public LocalDateTime getNextRunAt() {
+        return nextRunAt;
+    }
+
+    public void setNextRunAt(LocalDateTime nextRunAt) {
+        this.nextRunAt = nextRunAt;
+    }
+
     public ScheduleStatus getStatus() {
         return status;
     }
 
     public void setStatus(ScheduleStatus status) {
         this.status = status;
+    }
+
+    public ScheduleStatus getLastRunStatus() {
+        return lastRunStatus;
+    }
+
+    public void setLastRunStatus(ScheduleStatus lastRunStatus) {
+        this.lastRunStatus = lastRunStatus;
     }
 
     public LocalDateTime getExecutedAt() {
@@ -158,6 +228,22 @@ public class ScheduledTransaction {
 
     public void setFailureReason(String failureReason) {
         this.failureReason = failureReason;
+    }
+
+    public int getTotalSuccess() {
+        return totalSuccess;
+    }
+
+    public void setTotalSuccess(int totalSuccess) {
+        this.totalSuccess = totalSuccess;
+    }
+
+    public int getTotalFailed() {
+        return totalFailed;
+    }
+
+    public void setTotalFailed(int totalFailed) {
+        this.totalFailed = totalFailed;
     }
 
     public LocalDateTime getCreatedAt() {

@@ -1,11 +1,14 @@
 package com.example.financeapp.scheduled.dto;
 
+import com.example.financeapp.scheduled.entity.ScheduledTransaction.ScheduleType;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Future;
+import jakarta.validation.constraints.FutureOrPresent;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 public class CreateScheduledTransactionRequest {
@@ -26,9 +29,15 @@ public class CreateScheduledTransactionRequest {
     @Size(max = 500, message = "Ghi chú không quá 500 ký tự")
     private String note;
 
+    @NotNull(message = "Kiểu lịch không được để trống")
+    private ScheduleType scheduleType;
+
     @NotNull(message = "Thời gian hẹn không được để trống")
     @Future(message = "Thời gian hẹn phải ở tương lai")
     private LocalDateTime scheduleTime;
+
+    @FutureOrPresent(message = "Ngày kết thúc phải ở hiện tại hoặc tương lai")
+    private LocalDate endDate;
 
     public Long getWalletId() {
         return walletId;
@@ -70,12 +79,28 @@ public class CreateScheduledTransactionRequest {
         this.note = note;
     }
 
+    public ScheduleType getScheduleType() {
+        return scheduleType;
+    }
+
+    public void setScheduleType(ScheduleType scheduleType) {
+        this.scheduleType = scheduleType;
+    }
+
     public LocalDateTime getScheduleTime() {
         return scheduleTime;
     }
 
     public void setScheduleTime(LocalDateTime scheduleTime) {
         this.scheduleTime = scheduleTime;
+    }
+
+    public LocalDate getEndDate() {
+        return endDate;
+    }
+
+    public void setEndDate(LocalDate endDate) {
+        this.endDate = endDate;
     }
 }
 

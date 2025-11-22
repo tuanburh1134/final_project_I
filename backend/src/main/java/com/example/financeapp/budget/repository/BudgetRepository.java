@@ -15,6 +15,8 @@ public interface BudgetRepository extends JpaRepository<Budget, Long> {
 
     List<Budget> findByUser_UserIdOrderByStartDateDesc(Long userId);
 
+    boolean existsByWallet_WalletId(Long walletId);
+
     // ← METHOD MỚI: kiểm tra trùng chính xác 100%
     @Query("""
         SELECT CASE WHEN COUNT(b) > 0 THEN true ELSE false END

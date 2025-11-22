@@ -12,9 +12,9 @@ import java.util.Optional;
 
 public interface ScheduledTransactionRepository extends JpaRepository<ScheduledTransaction, Long> {
 
-    List<ScheduledTransaction> findByUser_UserIdOrderByScheduleTimeDesc(Long userId);
+    List<ScheduledTransaction> findByUser_UserIdOrderByCreatedAtDesc(Long userId);
 
-    List<ScheduledTransaction> findTop50ByStatusAndScheduleTimeBeforeOrderByScheduleTimeAsc(
+    List<ScheduledTransaction> findTop50ByStatusAndNextRunAtLessThanEqualOrderByNextRunAtAsc(
             ScheduleStatus status, LocalDateTime scheduleTime);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

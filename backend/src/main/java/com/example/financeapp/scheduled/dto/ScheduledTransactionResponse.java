@@ -3,6 +3,7 @@ package com.example.financeapp.scheduled.dto;
 import com.example.financeapp.scheduled.entity.ScheduledTransaction;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 public class ScheduledTransactionResponse {
@@ -16,7 +17,13 @@ public class ScheduledTransactionResponse {
     private BigDecimal amount;
     private String note;
     private LocalDateTime scheduleTime;
+    private LocalDateTime nextRunAt;
     private String status;
+    private String scheduleType;
+    private LocalDate endDate;
+    private String lastRunStatus;
+    private int totalSuccess;
+    private int totalFailed;
     private LocalDateTime executedAt;
     private String failureReason;
 
@@ -38,7 +45,15 @@ public class ScheduledTransactionResponse {
         resp.setAmount(st.getAmount());
         resp.setNote(st.getNote());
         resp.setScheduleTime(st.getScheduleTime());
+        resp.setNextRunAt(st.getNextRunAt());
+        resp.setScheduleType(st.getScheduleType().name());
+        resp.setEndDate(st.getEndDate());
         resp.setStatus(st.getStatus().name());
+        if (st.getLastRunStatus() != null) {
+            resp.setLastRunStatus(st.getLastRunStatus().name());
+        }
+        resp.setTotalSuccess(st.getTotalSuccess());
+        resp.setTotalFailed(st.getTotalFailed());
         resp.setExecutedAt(st.getExecutedAt());
         resp.setFailureReason(st.getFailureReason());
         return resp;
@@ -126,12 +141,60 @@ public class ScheduledTransactionResponse {
         this.scheduleTime = scheduleTime;
     }
 
+    public LocalDateTime getNextRunAt() {
+        return nextRunAt;
+    }
+
+    public void setNextRunAt(LocalDateTime nextRunAt) {
+        this.nextRunAt = nextRunAt;
+    }
+
     public String getStatus() {
         return status;
     }
 
     public void setStatus(String status) {
         this.status = status;
+    }
+
+    public String getScheduleType() {
+        return scheduleType;
+    }
+
+    public void setScheduleType(String scheduleType) {
+        this.scheduleType = scheduleType;
+    }
+
+    public LocalDate getEndDate() {
+        return endDate;
+    }
+
+    public void setEndDate(LocalDate endDate) {
+        this.endDate = endDate;
+    }
+
+    public String getLastRunStatus() {
+        return lastRunStatus;
+    }
+
+    public void setLastRunStatus(String lastRunStatus) {
+        this.lastRunStatus = lastRunStatus;
+    }
+
+    public int getTotalSuccess() {
+        return totalSuccess;
+    }
+
+    public void setTotalSuccess(int totalSuccess) {
+        this.totalSuccess = totalSuccess;
+    }
+
+    public int getTotalFailed() {
+        return totalFailed;
+    }
+
+    public void setTotalFailed(int totalFailed) {
+        this.totalFailed = totalFailed;
     }
 
     public LocalDateTime getExecutedAt() {

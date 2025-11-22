@@ -1,9 +1,11 @@
 package com.example.financeapp.transaction.service.impl;
 
+import com.example.financeapp.budget.dto.BudgetAlert;
 import com.example.financeapp.budget.service.BudgetService;
 import com.example.financeapp.category.entity.Category;
 import com.example.financeapp.category.repository.CategoryRepository;
 import com.example.financeapp.transaction.dto.CreateTransactionRequest;
+import com.example.financeapp.transaction.dto.TransactionResult;
 import com.example.financeapp.transaction.dto.UpdateTransactionRequest;
 import com.example.financeapp.transaction.entity.Transaction;
 import com.example.financeapp.transaction.entity.TransactionType;
@@ -37,7 +39,7 @@ public class TransactionServiceImpl implements TransactionService {
     @Autowired private WalletMemberRepository walletMemberRepository;
     @Autowired private BudgetService budgetService;
 
-    private Transaction createTransaction(Long userId, CreateTransactionRequest req, String typeName) {
+    private TransactionResult createTransaction(Long userId, CreateTransactionRequest req, String typeName) {
         // 1. Kiểm tra user tồn tại
         long safeUserId = requireUserId(userId);
 
@@ -112,22 +114,23 @@ public class TransactionServiceImpl implements TransactionService {
 
         Transaction savedTransaction = transactionRepository.save(tx);
 
+        BudgetAlert alert = null;
         if ("Chi tiêu".equals(typeName)) {
-            budgetService.handleExpenseTransaction(savedTransaction);
+            alert = budgetService.handleExpenseTransaction(savedTransaction);
         }
 
-        return savedTransaction;
+        return new TransactionResult(savedTransaction, alert);
     }
 
     @Override
     @Transactional
-    public Transaction createExpense(Long userId, CreateTransactionRequest request) {
+    public TransactionResult createExpense(Long userId, CreateTransactionRequest request) {
         return createTransaction(userId, request, "Chi tiêu");
     }
 
     @Override
     @Transactional
-    public Transaction createIncome(Long userId, CreateTransactionRequest request) {
+    public TransactionResult createIncome(Long userId, CreateTransactionRequest request) {
         return createTransaction(userId, request, "Thu nhập");
     }
 
