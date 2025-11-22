@@ -1,19 +1,32 @@
 package com.example.financeapp.budget.service.impl;
 
+import com.example.financeapp.budget.dto.BudgetSummaryResponse;
 import com.example.financeapp.budget.dto.CreateBudgetRequest;
 import com.example.financeapp.budget.entity.Budget;
 import com.example.financeapp.budget.repository.BudgetRepository;
 import com.example.financeapp.budget.service.BudgetService;
 import com.example.financeapp.category.entity.Category;
 import com.example.financeapp.category.repository.CategoryRepository;
+import com.example.financeapp.common.service.EmailService;
+import com.example.financeapp.transaction.entity.Transaction;
+import com.example.financeapp.transaction.repository.TransactionRepository;
 import com.example.financeapp.user.entity.User;
 import com.example.financeapp.user.repository.UserRepository;
 import com.example.financeapp.wallet.entity.Wallet;
 import com.example.financeapp.wallet.repository.WalletRepository;
 import com.example.financeapp.wallet.service.WalletService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Service
 public class BudgetServiceImpl implements BudgetService {
@@ -28,10 +41,14 @@ public class BudgetServiceImpl implements BudgetService {
     private WalletRepository walletRepository;
     @Autowired
     private WalletService walletService;
+    @Autowired
+    private TransactionRepository transactionRepository;
+    @Autowired
+    private EmailService emailService;
 
     @Override
     @Transactional
-    public Budget createBudget(Long userId, CreateBudgetRequest request) {
+    public Budget createBudget(@NonNull Long userId, CreateBudgetRequest request) {
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
@@ -40,16 +57,22 @@ public class BudgetServiceImpl implements BudgetService {
             throw new RuntimeException("Ngày bắt đầu phải trước hoặc bằng ngày kết thúc");
         }
 
-        Category category = categoryRepository.findById(request.getCategoryId())
+        Long categoryId = request.getCategoryId();
+        if (categoryId == null) {
+            throw new RuntimeException("Danh mục không hợp lệ");
+        }
+
+        Category category = categoryRepository.findById(categoryId)
                 .orElseThrow(() -> new RuntimeException("Danh mục không tồn tại"));
 
         if (!"Chi tiêu".equals(category.getTransactionType().getTypeName())) {
             throw new RuntimeException("Chỉ được tạo ngân sách cho danh mục Chi tiêu");
         }
 
+        Long requestedWalletId = request.getWalletId();
         Long walletIdForCheck = null;
-        if (request.getWalletId() != null) {
-            Wallet wallet = walletRepository.findById(request.getWalletId())
+        if (requestedWalletId != null) {
+            Wallet wallet = walletRepository.findById(requestedWalletId)
                     .orElseThrow(() -> new RuntimeException("Ví không tồn tại"));
 
             if (!walletService.hasAccess(wallet.getWalletId(), userId)) {
@@ -61,7 +84,7 @@ public class BudgetServiceImpl implements BudgetService {
         // KIỂM TRA GIAO NHAU (OVERLAP) – CHẶN HOÀN TOÀN
         boolean hasOverlap = budgetRepository.existsOverlappingBudget(
                 user,
-                request.getCategoryId(),
+                categoryId,
                 walletIdForCheck,
                 request.getStartDate(),
                 request.getEndDate()
@@ -78,9 +101,10 @@ public class BudgetServiceImpl implements BudgetService {
         }
 
         // Nếu không trùng → tạo bình thường
-        Wallet wallet = walletIdForCheck != null
-                ? walletRepository.findById(walletIdForCheck).orElse(null)
-                : null;
+        Wallet wallet = null;
+        if (walletIdForCheck != null) {
+            wallet = walletRepository.findById(walletIdForCheck).orElse(null);
+        }
 
         Budget budget = new Budget();
         budget.setUser(user);
@@ -94,4 +118,164 @@ public class BudgetServiceImpl implements BudgetService {
 
         return budgetRepository.save(budget);
     }
+
+    @Override
+    @Transactional
+    public List<BudgetSummaryResponse> getBudgets(@NonNull Long userId) {
+        List<Budget> budgets = budgetRepository.findByUser_UserIdOrderByStartDateDesc(userId);
+        return budgets.stream()
+                .map(budget -> buildBudgetSummary(budget, userId))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Transaction> getBudgetTransactions(@NonNull Long userId, Long budgetId) {
+        if (budgetId == null) {
+            throw new RuntimeException("Ngân sách không hợp lệ");
+        }
+
+        Budget budget = budgetRepository.findById(budgetId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy ngân sách"));
+
+        if (!budget.getUser().getUserId().equals(userId)) {
+            throw new RuntimeException("Bạn không có quyền xem ngân sách này");
+        }
+
+        Long walletId = budget.getWallet() != null ? budget.getWallet().getWalletId() : null;
+        LocalDateTime start = budget.getStartDate().atStartOfDay();
+        LocalDateTime end = budget.getEndDate().atTime(LocalTime.MAX);
+
+        return transactionRepository.findTransactionsForBudget(
+                userId,
+                budget.getCategory().getCategoryId(),
+                walletId,
+                start,
+                end
+        );
+    }
+
+    private BudgetSummaryResponse buildBudgetSummary(Budget budget, Long userId) {
+        Long walletId = budget.getWallet() != null ? budget.getWallet().getWalletId() : null;
+
+        LocalDateTime start = budget.getStartDate().atStartOfDay();
+        LocalDateTime end = budget.getEndDate().atTime(LocalTime.MAX);
+
+        BigDecimal spent = transactionRepository.sumExpensesForBudget(
+                userId,
+                budget.getCategory().getCategoryId(),
+                walletId,
+                start,
+                end
+        );
+
+        if (spent == null) {
+            spent = BigDecimal.ZERO;
+        }
+
+        BigDecimal amountLimit = budget.getAmountLimit() != null ? budget.getAmountLimit() : BigDecimal.ZERO;
+        BigDecimal remaining = amountLimit.subtract(spent);
+
+        BigDecimal progress = BigDecimal.ZERO;
+        if (amountLimit.compareTo(BigDecimal.ZERO) > 0) {
+            progress = spent
+                    .multiply(BigDecimal.valueOf(100))
+                    .divide(amountLimit, 2, RoundingMode.HALF_UP);
+        }
+
+        AlertInfo alertInfo = handleBudgetAlerts(budget, amountLimit, spent, remaining);
+
+        BudgetSummaryResponse response = new BudgetSummaryResponse();
+        response.setBudgetId(budget.getBudgetId());
+        response.setCategoryId(budget.getCategory().getCategoryId());
+        response.setCategoryName(budget.getCategory().getCategoryName());
+        response.setAmountLimit(amountLimit);
+        response.setSpentAmount(spent);
+        response.setRemainingAmount(remaining);
+        response.setProgressPercentage(progress);
+        response.setOverLimit(remaining.compareTo(BigDecimal.ZERO) < 0);
+        response.setWarningTriggered(alertInfo.warningTriggered());
+        response.setOverLimitAlertTriggered(alertInfo.overLimitTriggered());
+        response.setWarningThresholdPercent(alertInfo.thresholdPercent());
+        response.setStartDate(budget.getStartDate());
+        response.setEndDate(budget.getEndDate());
+        response.setNote(budget.getNote());
+        response.setAppliesToAllWallets(walletId == null);
+
+        if (walletId != null) {
+            response.setWalletId(walletId);
+            response.setWalletName(budget.getWallet().getWalletName());
+        }
+
+        return response;
+    }
+
+    private AlertInfo handleBudgetAlerts(Budget budget,
+                                         BigDecimal amountLimit,
+                                         BigDecimal spent,
+                                         BigDecimal remaining) {
+        Objects.requireNonNull(budget, "Budget is required");
+        if (amountLimit == null || amountLimit.compareTo(BigDecimal.ZERO) <= 0) {
+            return new AlertInfo(false, remaining.compareTo(BigDecimal.ZERO) <= 0,
+                    defaultThresholdPercent(budget));
+        }
+
+        BigDecimal thresholdPercent = defaultThresholdPercent(budget);
+        BigDecimal thresholdValue = amountLimit
+                .multiply(thresholdPercent)
+                .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+
+        boolean warningTriggered = remaining.compareTo(BigDecimal.ZERO) > 0
+                && remaining.compareTo(thresholdValue) <= 0;
+        boolean overLimitTriggered = remaining.compareTo(BigDecimal.ZERO) <= 0;
+
+        boolean budgetUpdated = false;
+
+        if (warningTriggered && !budget.isWarningAlertSent()) {
+            sendWarningEmail(budget, remaining, amountLimit);
+            budget.setWarningAlertSent(true);
+            budgetUpdated = true;
+        }
+
+        if (overLimitTriggered && !budget.isOverLimitAlertSent()) {
+            sendOverLimitEmail(budget, spent, amountLimit);
+            budget.setOverLimitAlertSent(true);
+            budgetUpdated = true;
+        }
+
+        if (budgetUpdated) {
+            budgetRepository.save(budget);
+        }
+
+        return new AlertInfo(warningTriggered, overLimitTriggered, thresholdPercent);
+    }
+
+    private BigDecimal defaultThresholdPercent(Budget budget) {
+        BigDecimal threshold = budget.getWarningThresholdPercent();
+        if (threshold == null || threshold.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.valueOf(20);
+        }
+        return threshold;
+    }
+
+    private void sendWarningEmail(Budget budget, BigDecimal remaining, BigDecimal amountLimit) {
+        emailService.sendBudgetWarningEmail(
+                budget.getUser().getEmail(),
+                budget.getCategory().getCategoryName(),
+                remaining,
+                amountLimit
+        );
+    }
+
+    private void sendOverLimitEmail(Budget budget, BigDecimal spent, BigDecimal amountLimit) {
+        emailService.sendBudgetExceededEmail(
+                budget.getUser().getEmail(),
+                budget.getCategory().getCategoryName(),
+                spent,
+                amountLimit
+        );
+    }
+
+    private record AlertInfo(boolean warningTriggered, boolean overLimitTriggered,
+                             BigDecimal thresholdPercent) {}
 }

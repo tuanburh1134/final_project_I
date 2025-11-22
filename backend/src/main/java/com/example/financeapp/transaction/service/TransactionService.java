@@ -12,4 +12,5 @@ public interface TransactionService {
     Transaction updateTransaction(Long userId, Long transactionId, UpdateTransactionRequest request);
     void deleteTransaction(Long userId, Long transactionId);
     List<Transaction> getAllTransactions(Long userId);
+    List<Transaction> getTransactionsForReport(Long userId, java.time.LocalDate startDate, java.time.LocalDate endDate, Long walletId);
 }

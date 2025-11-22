@@ -778,6 +778,222 @@ hoặc
 
 ---
 
+## 📊 Budget APIs
+
+### 1. Tạo ngân sách
+**POST** `/budgets/create`
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Request Body:**
+```json
+{
+  "categoryId": 3,
+  "walletId": 1,
+  "amountLimit": 5000000,
+  "startDate": "2024-02-01",
+  "endDate": "2024-02-29",
+  "note": "Ăn uống tháng 2"
+}
+```
+
+**Response:**
+```json
+{
+  "message": "Tạo hạn mức chi tiêu thành công",
+  "budget": {
+    "budgetId": 1,
+    "categoryId": 3,
+    "walletId": 1,
+    "amountLimit": 5000000,
+    "startDate": "2024-02-01",
+    "endDate": "2024-02-29"
+  }
+}
+```
+
+---
+
+### 2. Lấy danh sách ngân sách + số tiền còn lại
+**GET** `/budgets`
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Response:**
+```json
+{
+  "budgets": [
+    {
+      "budgetId": 1,
+      "categoryId": 3,
+      "categoryName": "Ăn uống",
+      "walletId": 1,
+      "walletName": "Ví cá nhân",
+      "appliesToAllWallets": false,
+      "amountLimit": 5000000,
+      "spentAmount": 1200000,
+      "remainingAmount": 3800000,
+      "progressPercentage": 24.00,
+      "overLimit": false,
+      "warningTriggered": false,
+      "overLimitAlertTriggered": false,
+      "warningThresholdPercent": 20,
+      "startDate": "2024-02-01",
+      "endDate": "2024-02-29",
+      "note": "Ăn uống tháng 2"
+    }
+  ],
+  "total": 1
+}
+```
+
+**Lưu ý:**
+- `remainingAmount` có thể âm nếu đã chi quá ngân sách.
+- `appliesToAllWallets = true` nghĩa là ngân sách áp dụng cho mọi ví của bạn.
+- Khi `warningTriggered = true`, hệ thống đã gửi email cảnh báo (mặc định khi còn ≤20%). Khi `overLimitAlertTriggered = true`, bạn đã vượt hạn mức và đã nhận email thông báo.
+
+---
+
+### 3. Lấy giao dịch của một ngân sách
+**GET** `/budgets/{budgetId}/transactions`
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Response:**
+```json
+{
+  "transactions": [
+    {
+      "transactionId": 12,
+      "amount": 250000,
+      "transactionDate": "2024-02-05T08:00:00",
+      "note": "Ăn trưa",
+      "category": { ... },
+      "wallet": { ... }
+    }
+  ],
+  "total": 1
+}
+```
+
+**Nguyên tắc lọc:**
+- Chỉ trả các giao dịch của người dùng hiện tại.
+- Khớp đúng danh mục của ngân sách.
+- Giới hạn trong khoảng `startDate` → `endDate` của ngân sách.
+- Nếu ngân sách gắn một ví cụ thể, chỉ lấy giao dịch của ví đó; nếu để “Tất cả các ví” thì không lọc theo ví.
+- Nếu hệ thống tự động gửi cảnh báo vượt/chuẩn bị vượt ngân sách, các trường `warningTriggered` và `overLimitAlertTriggered` trong `GET /budgets` sẽ phản ánh trạng thái hiện tại.
+
+---
+
+## 📄 Report APIs
+
+### 1. Xuất báo cáo giao dịch (Excel/PDF)
+**GET** `/reports/transactions/export?format=excel&startDate=2024-01-01&endDate=2024-01-31&walletId=1`
+
+**Query params (tùy chọn):**
+- `format`: `excel` (mặc định) hoặc `pdf`
+- `startDate`, `endDate`: ngày lọc (ISO `yyyy-MM-dd`)
+- `walletId`: chỉ xuất giao dịch của một ví cụ thể
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Response:** File đính kèm (`Content-Disposition: attachment; filename=...`) dạng Excel hoặc PDF.
+
+**Lưu ý:**
+- Nếu không truyền `startDate` / `endDate` hệ thống xuất toàn bộ lịch sử giao dịch.
+- Nếu không truyền `walletId` sẽ lấy tất cả ví mà bạn có quyền.
+
+---
+
+## ⏰ Scheduled Transaction APIs
+
+### 1. Tạo giao dịch đặt lịch
+**POST** `/scheduled-transactions`
+
+**Request Body:**
+```json
+{
+  "walletId": 1,
+  "categoryId": 3,
+  "transactionTypeId": 1,
+  "amount": 250000,
+  "note": "Thanh toán tiền điện",
+  "scheduleTime": "2024-02-05T08:00:00"
+}
+```
+
+**Response:**
+```json
+{
+  "message": "Tạo lịch giao dịch thành công",
+  "schedule": {
+    "scheduleId": 10,
+    "walletId": 1,
+    "walletName": "Ví chính",
+    "categoryId": 3,
+    "categoryName": "Hóa đơn",
+    "transactionTypeId": 1,
+    "transactionTypeName": "Chi tiêu",
+    "amount": 250000,
+    "note": "Thanh toán tiền điện",
+    "scheduleTime": "2024-02-05T08:00:00",
+    "status": "PENDING"
+  }
+}
+```
+
+---
+
+### 2. Danh sách giao dịch đặt lịch
+**GET** `/scheduled-transactions`
+
+**Response:**
+```json
+{
+  "schedules": [
+    {
+      "scheduleId": 10,
+      "walletId": 1,
+      "walletName": "Ví chính",
+      "categoryId": 3,
+      "categoryName": "Hóa đơn",
+      "transactionTypeId": 1,
+      "transactionTypeName": "Chi tiêu",
+      "amount": 250000,
+      "note": "Thanh toán tiền điện",
+      "scheduleTime": "2024-02-05T08:00:00",
+      "status": "PENDING",
+      "executedAt": null,
+      "failureReason": null
+    }
+  ],
+  "total": 1
+}
+```
+
+**Trạng thái có thể:**
+- `PENDING`: Chờ đến thời gian hẹn
+- `PROCESSING`: Đang thực thi
+- `COMPLETED`: Đã tạo giao dịch thành công
+- `FAILED`: Thực thi thất bại (xem `failureReason`)
+- `CANCELLED`: Người dùng hủy
+
+---
+
+### 3. Hủy lịch giao dịch
+**DELETE** `/scheduled-transactions/{scheduleId}`
+
+**Response:**
+```json
+{ "message": "Đã hủy lịch giao dịch" }
+```
+
+**Lưu ý chung:**
+- Hệ thống kiểm tra lịch mỗi phút; khi đến `scheduleTime`, giao dịch sẽ tự động được tạo bằng cùng logic với giao dịch thủ công.
+- Nếu ví bị thiếu tiền khi tới hạn, lịch sẽ chuyển sang `FAILED` và ghi lại lý do.
+
+---
+
 ## 📁 Category APIs
 
 ### 1. Tạo danh mục mới

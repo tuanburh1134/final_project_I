@@ -9,8 +9,11 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
+import java.util.List;
 
 public interface BudgetRepository extends JpaRepository<Budget, Long> {
+
+    List<Budget> findByUser_UserIdOrderByStartDateDesc(Long userId);
 
     // ← METHOD MỚI: kiểm tra trùng chính xác 100%
     @Query("""

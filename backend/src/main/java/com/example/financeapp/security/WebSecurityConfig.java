@@ -31,7 +31,10 @@ public class WebSecurityConfig {
                         "/profile/**",
                         "/wallets/**",
                         "/transactions/**",
-                        "/categories/**"
+                        "/categories/**",
+                        "/budgets/**",
+                        "/reports/**",
+                        "/scheduled-transactions/**"
                 )
                 .csrf(csrf -> csrf.disable())
                 .cors(Customizer.withDefaults())
@@ -56,7 +59,10 @@ public class WebSecurityConfig {
                                 "/profile/**",
                                 "/wallets/**",
                                 "/transactions/**",
-                                "/categories/**"
+                                "/categories/**",
+                                "/budgets/**",
+                                "/reports/**",
+                                "/scheduled-transactions/**"
                         ).authenticated()
 
 

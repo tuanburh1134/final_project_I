@@ -6,6 +6,8 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 public interface TransactionRepository extends JpaRepository<Transaction, Long> {
@@ -44,4 +46,47 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
      * Kiểm tra category có trong giao dịch không
      */
     boolean existsByCategory_CategoryId(Long categoryId);
+
+    @Query("""
+            SELECT COALESCE(SUM(t.amount), 0)
+            FROM Transaction t
+            WHERE t.user.userId = :userId
+              AND t.category.categoryId = :categoryId
+              AND t.transactionDate BETWEEN :startDate AND :endDate
+              AND (:walletId IS NULL OR t.wallet.walletId = :walletId)
+            """)
+    BigDecimal sumExpensesForBudget(@Param("userId") Long userId,
+                                    @Param("categoryId") Long categoryId,
+                                    @Param("walletId") Long walletId,
+                                    @Param("startDate") LocalDateTime startDate,
+                                    @Param("endDate") LocalDateTime endDate);
+
+    @Query("""
+            SELECT t
+            FROM Transaction t
+            WHERE t.user.userId = :userId
+              AND t.category.categoryId = :categoryId
+              AND t.transactionDate BETWEEN :startDate AND :endDate
+              AND (:walletId IS NULL OR t.wallet.walletId = :walletId)
+            ORDER BY t.transactionDate DESC
+            """)
+    List<Transaction> findTransactionsForBudget(@Param("userId") Long userId,
+                                                @Param("categoryId") Long categoryId,
+                                                @Param("walletId") Long walletId,
+                                                @Param("startDate") LocalDateTime startDate,
+                                                @Param("endDate") LocalDateTime endDate);
+
+    @Query("""
+            SELECT t
+            FROM Transaction t
+            WHERE t.user.userId = :userId
+              AND (:startDate IS NULL OR t.transactionDate >= :startDate)
+              AND (:endDate IS NULL OR t.transactionDate <= :endDate)
+              AND (:walletId IS NULL OR t.wallet.walletId = :walletId)
+            ORDER BY t.transactionDate DESC
+            """)
+    List<Transaction> findTransactionsForReport(@Param("userId") Long userId,
+                                                @Param("startDate") LocalDateTime startDate,
+                                                @Param("endDate") LocalDateTime endDate,
+                                                @Param("walletId") Long walletId);
 }
