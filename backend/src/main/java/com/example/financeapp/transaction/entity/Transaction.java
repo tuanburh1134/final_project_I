@@ -1,8 +1,10 @@
 package com.example.financeapp.transaction.entity;
 
+import com.example.financeapp.budget.entity.Budget;
 import com.example.financeapp.category.entity.Category;
 import com.example.financeapp.user.entity.User;
 import com.example.financeapp.wallet.entity.Wallet;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -43,6 +45,17 @@ public class Transaction {
 
     @Column(name = "image_url", columnDefinition = "LONGTEXT")
     private String imageUrl;
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "budget_id")
+    private Budget budget;
+
+    @Column(name = "is_over_budget")
+    private boolean overBudget = false;
+
+    @Column(name = "over_budget_amount", precision = 20, scale = 8)
+    private BigDecimal overBudgetAmount = BigDecimal.ZERO;
 
     // ============ FIELDS CHO CURRENCY CONVERSION (Merge Wallet) ============
 
@@ -96,6 +109,15 @@ public class Transaction {
 
     public String getImageUrl() { return imageUrl; }
     public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
+
+    public Budget getBudget() { return budget; }
+    public void setBudget(Budget budget) { this.budget = budget; }
+
+    public boolean isOverBudget() { return overBudget; }
+    public void setOverBudget(boolean overBudget) { this.overBudget = overBudget; }
+
+    public BigDecimal getOverBudgetAmount() { return overBudgetAmount; }
+    public void setOverBudgetAmount(BigDecimal overBudgetAmount) { this.overBudgetAmount = overBudgetAmount; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

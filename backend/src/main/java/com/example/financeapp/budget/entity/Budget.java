@@ -47,6 +47,22 @@ public class Budget {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt = LocalDateTime.now();
 
+    @Column(name = "warning_threshold_percent", precision = 5, scale = 2)
+    private BigDecimal warningThresholdPercent = BigDecimal.valueOf(20);
+
+    @Column(name = "warning_alert_sent")
+    private boolean warningAlertSent = false;
+
+    @Column(name = "over_limit_alert_sent")
+    private boolean overLimitAlertSent = false;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", length = 20)
+    private BudgetStatus status = BudgetStatus.ACTIVE;
+
+    @Column(name = "over_budget_amount", precision = 20, scale = 8)
+    private BigDecimal overBudgetAmount = BigDecimal.ZERO;
+
     @PreUpdate
     public void preUpdate() {
         this.updatedAt = LocalDateTime.now();
@@ -82,4 +98,50 @@ public class Budget {
 
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+
+    public BigDecimal getWarningThresholdPercent() {
+        return warningThresholdPercent;
+    }
+
+    public void setWarningThresholdPercent(BigDecimal warningThresholdPercent) {
+        this.warningThresholdPercent = warningThresholdPercent;
+    }
+
+    public boolean isWarningAlertSent() {
+        return warningAlertSent;
+    }
+
+    public void setWarningAlertSent(boolean warningAlertSent) {
+        this.warningAlertSent = warningAlertSent;
+    }
+
+    public boolean isOverLimitAlertSent() {
+        return overLimitAlertSent;
+    }
+
+    public void setOverLimitAlertSent(boolean overLimitAlertSent) {
+        this.overLimitAlertSent = overLimitAlertSent;
+    }
+
+    public BudgetStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(BudgetStatus status) {
+        this.status = status;
+    }
+
+    public BigDecimal getOverBudgetAmount() {
+        return overBudgetAmount;
+    }
+
+    public void setOverBudgetAmount(BigDecimal overBudgetAmount) {
+        this.overBudgetAmount = overBudgetAmount;
+    }
+
+    public enum BudgetStatus {
+        ACTIVE,
+        OVER_LIMIT,
+        COMPLETED
+    }
 }

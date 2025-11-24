@@ -420,6 +420,148 @@ export const walletAPI = {
   },
 };
 
+// ==================== BUDGET APIs ====================
+
+export const budgetAPI = {
+  /**
+   * Tạo ngân sách mới
+   */
+  createBudget: async (categoryId, walletId, amountLimit, startDate, endDate, note) => {
+    return apiCall('/budgets/create', {
+      method: 'POST',
+      body: JSON.stringify({
+        categoryId,
+        walletId,
+        amountLimit,
+        startDate,
+        endDate,
+        note,
+      }),
+    });
+  },
+
+  /**
+   * Lấy danh sách ngân sách + số tiền còn lại
+   */
+  getBudgets: async () => {
+    return apiCall('/budgets');
+  },
+
+  /**
+   * Lấy các giao dịch thuộc một ngân sách
+   */
+  getBudgetTransactions: async (budgetId) => {
+    return apiCall(`/budgets/${budgetId}/transactions`);
+  },
+};
+
+// ==================== REPORT APIs ====================
+
+export const reportAPI = {
+  /**
+   * Xuất giao dịch ra Excel/PDF
+   */
+  exportTransactions: async (format = 'excel', startDate, endDate, walletId) => {
+    const params = new URLSearchParams();
+    if (format) params.append('format', format);
+    if (startDate) params.append('startDate', startDate);
+    if (endDate) params.append('endDate', endDate);
+    if (walletId) params.append('walletId', walletId);
+
+    const response = await fetch(
+      `${API_BASE_URL}/reports/transactions/export?${params.toString()}`,
+      {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.error || 'Không thể xuất báo cáo');
+    }
+
+    return {
+      blob: await response.blob(),
+      filename: getFileNameFromDisposition(response.headers.get('Content-Disposition')),
+      contentType: response.headers.get('Content-Type'),
+    };
+  },
+};
+
+// ==================== SCHEDULED TRANSACTION APIs ====================
+
+export const scheduledTransactionAPI = {
+  createSchedule: async (payload) => {
+    return apiCall('/scheduled-transactions', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  getSchedules: async () => {
+    return apiCall('/scheduled-transactions');
+  },
+
+  getLogs: async (scheduleId) => {
+    return apiCall(`/scheduled-transactions/${scheduleId}/logs`);
+  },
+
+  cancelSchedule: async (scheduleId) => {
+    return apiCall(`/scheduled-transactions/${scheduleId}`, {
+      method: 'DELETE',
+    });
+  },
+};
+
+// ==================== FUND / SAVINGS GOAL APIs ====================
+
+export const fundAPI = {
+  createFund: async (payload) => {
+    return apiCall('/funds', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  getDashboard: async () => apiCall('/funds/dashboard'),
+
+  getDetail: async (fundId) => apiCall(`/funds/${fundId}`),
+};
+
+// ==================== BACKUP APIs ====================
+
+export const backupAPI = {
+  backupNow: async () => {
+    return apiCall('/backup/me', {
+      method: 'POST',
+    });
+  },
+
+  getStatus: async () => apiCall('/backup/status'),
+};
+
+// ==================== FEEDBACK APIs ====================
+
+export const feedbackAPI = {
+  submitFeedback: async (payload) => {
+    return apiCall('/feedback', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  getMyFeedback: async () => apiCall('/feedback'),
+};
+
+function getFileNameFromDisposition(disposition) {
+  if (!disposition) return 'transactions_report';
+  const match = disposition.match(/filename="?([^"]+)"?/);
+  return match ? match[1] : 'transactions_report';
+}
+
 // ==================== CATEGORY APIs ====================
 
 export const categoryAPI = {
@@ -505,12 +647,32 @@ export const transactionAPI = {
   },
 };
 
+// ==================== DAILY REMINDER APIs ====================
+
+export const reminderAPI = {
+  getReminder: async () => apiCall('/reminders'),
+
+  upsertReminder: async ({ reminderTime, sendEmail = true, sendPush = false, enabled = true }) => {
+    return apiCall('/reminders', {
+      method: 'POST',
+      body: JSON.stringify({ reminderTime, sendEmail, sendPush, enabled }),
+    });
+  },
+};
+
 // ==================== EXPORT ALL APIs ====================
 
 export default {
   auth: authAPI,
   profile: profileAPI,
   wallet: walletAPI,
+  budget: budgetAPI,
+  report: reportAPI,
+  scheduledTransaction: scheduledTransactionAPI,
+  fund: fundAPI,
+  backup: backupAPI,
+  feedback: feedbackAPI,
+  reminder: reminderAPI,
   category: categoryAPI,
   transaction: transactionAPI,
 };

@@ -9,8 +9,13 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
+import java.util.List;
 
 public interface BudgetRepository extends JpaRepository<Budget, Long> {
+
+    List<Budget> findByUser_UserIdOrderByStartDateDesc(Long userId);
+
+    boolean existsByWallet_WalletId(Long walletId);
 
     // ← METHOD MỚI: kiểm tra trùng chính xác 100%
     @Query("""
@@ -55,4 +60,18 @@ public interface BudgetRepository extends JpaRepository<Budget, Long> {
             @Param("newStartDate") LocalDate newStartDate,
             @Param("newEndDate") LocalDate newEndDate
     );
+
+    @Query("""
+            SELECT b FROM Budget b
+            WHERE b.user.userId = :userId
+              AND b.category.categoryId = :categoryId
+              AND b.startDate <= :targetDate
+              AND b.endDate >= :targetDate
+              AND (:walletId IS NULL OR b.wallet IS NULL OR b.wallet.walletId = :walletId)
+            ORDER BY CASE WHEN b.wallet IS NULL THEN 1 ELSE 0 END
+            """)
+    List<Budget> findApplicableBudgets(@Param("userId") Long userId,
+                                       @Param("categoryId") Long categoryId,
+                                       @Param("walletId") Long walletId,
+                                       @Param("targetDate") LocalDate targetDate);
 }

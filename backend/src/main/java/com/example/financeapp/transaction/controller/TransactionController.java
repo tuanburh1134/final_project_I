@@ -1,11 +1,12 @@
 package com.example.financeapp.transaction.controller;
 
+import com.example.financeapp.budget.dto.BudgetAlert;
 import com.example.financeapp.transaction.dto.CreateTransactionRequest;
 import com.example.financeapp.transaction.dto.UpdateTransactionRequest;
 import com.example.financeapp.transaction.entity.Transaction;
+import com.example.financeapp.transaction.service.TransactionService;
 import com.example.financeapp.user.entity.User;
 import com.example.financeapp.user.repository.UserRepository;
-import com.example.financeapp.transaction.service.TransactionService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -35,9 +36,11 @@ public class TransactionController {
     public ResponseEntity<Map<String, Object>> addExpense(@Valid @RequestBody CreateTransactionRequest request) {
         Map<String, Object> res = new HashMap<>();
         try {
-            Transaction tx = transactionService.createExpense(getCurrentUserId(), request);
+            var result = transactionService.createExpense(getCurrentUserId(), request);
+            Transaction tx = result.getTransaction();
             res.put("message", "Thêm chi tiêu thành công");
             res.put("transaction", tx);
+            attachBudgetAlert(res, result.getBudgetAlert());
             return ResponseEntity.ok(res);
         } catch (Exception e) {
             res.put("error", e.getMessage());
@@ -49,9 +52,11 @@ public class TransactionController {
     public ResponseEntity<Map<String, Object>> addIncome(@Valid @RequestBody CreateTransactionRequest request) {
         Map<String, Object> res = new HashMap<>();
         try {
-            Transaction tx = transactionService.createIncome(getCurrentUserId(), request);
+            var result = transactionService.createIncome(getCurrentUserId(), request);
+            Transaction tx = result.getTransaction();
             res.put("message", "Thêm thu nhập thành công");
             res.put("transaction", tx);
+            attachBudgetAlert(res, result.getBudgetAlert());
             return ResponseEntity.ok(res);
         } catch (Exception e) {
             res.put("error", e.getMessage());
@@ -108,5 +113,14 @@ public class TransactionController {
             res.put("error", e.getMessage());
             return ResponseEntity.status(500).body(res);
         }
+    }
+
+    private void attachBudgetAlert(Map<String, Object> res, BudgetAlert alert) {
+        if (alert == null || !alert.isTriggered()) {
+            return;
+        }
+        res.put("budgetAlert", alert.getMessage());
+        res.put("budgetAlertLevel", alert.getLevel());
+        res.put("overBudgetAmount", alert.getOverBudgetAmount());
     }
 }

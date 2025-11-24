@@ -1,8 +1,11 @@
 package com.example.financeapp.transaction.service.impl;
 
+import com.example.financeapp.budget.dto.BudgetAlert;
+import com.example.financeapp.budget.service.BudgetService;
 import com.example.financeapp.category.entity.Category;
 import com.example.financeapp.category.repository.CategoryRepository;
 import com.example.financeapp.transaction.dto.CreateTransactionRequest;
+import com.example.financeapp.transaction.dto.TransactionResult;
 import com.example.financeapp.transaction.dto.UpdateTransactionRequest;
 import com.example.financeapp.transaction.entity.Transaction;
 import com.example.financeapp.transaction.entity.TransactionType;
@@ -19,7 +22,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 public class TransactionServiceImpl implements TransactionService {
@@ -30,22 +37,26 @@ public class TransactionServiceImpl implements TransactionService {
     @Autowired private TransactionTypeRepository typeRepository;
     @Autowired private CategoryRepository categoryRepository;
     @Autowired private WalletMemberRepository walletMemberRepository;
+    @Autowired private BudgetService budgetService;
 
-    private Transaction createTransaction(Long userId, CreateTransactionRequest req, String typeName) {
+    private TransactionResult createTransaction(Long userId, CreateTransactionRequest req, String typeName) {
         // 1. Kiểm tra user tồn tại
-        User user = userRepository.findById(userId)
+        long safeUserId = requireUserId(userId);
+
+        User user = userRepository.findById(safeUserId)
                 .orElseThrow(() -> new RuntimeException("User không tồn tại"));
 
         // 2. ✅ Kiểm tra wallet tồn tại với PESSIMISTIC LOCK
         // Tránh race condition khi nhiều transactions đồng thời
-        Wallet wallet = walletRepository.findByIdWithLock(req.getWalletId())
+        long walletId = requireId(req.getWalletId(), "Ví không hợp lệ");
+        Wallet wallet = walletRepository.findByIdWithLock(walletId)
                 .orElseThrow(() -> new RuntimeException("Ví không tồn tại"));
 
         // 3. Kiểm tra quyền truy cập (hỗ trợ shared wallet)
         // User phải là OWNER hoặc MEMBER của ví mới được tạo transaction
         boolean hasAccess = walletMemberRepository.existsByWallet_WalletIdAndUser_UserId(
-                req.getWalletId(),
-                userId
+                walletId,
+                safeUserId
         );
 
         if (!hasAccess) {
@@ -57,7 +68,8 @@ public class TransactionServiceImpl implements TransactionService {
                 .orElseThrow(() -> new RuntimeException("Loại giao dịch không tồn tại"));
 
         // 5. Lấy category và validate
-        Category category = categoryRepository.findById(req.getCategoryId())
+        long categoryId = requireId(req.getCategoryId(), "Danh mục không hợp lệ");
+        Category category = categoryRepository.findById(categoryId)
                 .orElseThrow(() -> new RuntimeException("Danh mục không tồn tại"));
 
         if (!category.getTransactionType().getTypeId().equals(type.getTypeId())) {
@@ -100,18 +112,25 @@ public class TransactionServiceImpl implements TransactionService {
         tx.setNote(req.getNote());
         tx.setImageUrl(req.getImageUrl());
 
-        return transactionRepository.save(tx);
+        Transaction savedTransaction = transactionRepository.save(tx);
+
+        BudgetAlert alert = null;
+        if ("Chi tiêu".equals(typeName)) {
+            alert = budgetService.handleExpenseTransaction(savedTransaction);
+        }
+
+        return new TransactionResult(savedTransaction, alert);
     }
 
     @Override
     @Transactional
-    public Transaction createExpense(Long userId, CreateTransactionRequest request) {
+    public TransactionResult createExpense(Long userId, CreateTransactionRequest request) {
         return createTransaction(userId, request, "Chi tiêu");
     }
 
     @Override
     @Transactional
-    public Transaction createIncome(Long userId, CreateTransactionRequest request) {
+    public TransactionResult createIncome(Long userId, CreateTransactionRequest request) {
         return createTransaction(userId, request, "Thu nhập");
     }
 
@@ -119,16 +138,18 @@ public class TransactionServiceImpl implements TransactionService {
     @Transactional
     public Transaction updateTransaction(Long userId, Long transactionId, UpdateTransactionRequest request) {
         // 1. Kiểm tra transaction tồn tại
-        Transaction transaction = transactionRepository.findById(transactionId)
+        long safeTransactionId = requireId(transactionId, "TransactionId không hợp lệ");
+        Transaction transaction = transactionRepository.findById(safeTransactionId)
                 .orElseThrow(() -> new RuntimeException("Giao dịch không tồn tại"));
 
         // 2. Kiểm tra quyền: user phải là owner của transaction
-        if (!transaction.getUser().getUserId().equals(userId)) {
+        if (!transaction.getUser().getUserId().equals(requireUserId(userId))) {
             throw new RuntimeException("Bạn không có quyền sửa giao dịch này");
         }
 
         // 3. Lấy category mới và validate
-        Category category = categoryRepository.findById(request.getCategoryId())
+        long newCategoryId = requireId(request.getCategoryId(), "Danh mục không hợp lệ");
+        Category category = categoryRepository.findById(newCategoryId)
                 .orElseThrow(() -> new RuntimeException("Danh mục không tồn tại"));
 
         // 4. Validate category phải cùng loại với transaction type hiện tại
@@ -149,11 +170,12 @@ public class TransactionServiceImpl implements TransactionService {
     @Transactional
     public void deleteTransaction(Long userId, Long transactionId) {
         // 1. Kiểm tra transaction tồn tại
-        Transaction transaction = transactionRepository.findById(transactionId)
+        long safeTransactionId = requireId(transactionId, "TransactionId không hợp lệ");
+        Transaction transaction = transactionRepository.findById(safeTransactionId)
                 .orElseThrow(() -> new RuntimeException("Giao dịch không tồn tại"));
 
         // 2. Kiểm tra quyền: user phải là owner của transaction
-        if (!transaction.getUser().getUserId().equals(userId)) {
+        if (!transaction.getUser().getUserId().equals(requireUserId(userId))) {
             throw new RuntimeException("Bạn không có quyền xóa giao dịch này");
         }
 
@@ -190,5 +212,20 @@ public class TransactionServiceImpl implements TransactionService {
     @Override
     public List<Transaction> getAllTransactions(Long userId) {
         return transactionRepository.findByUser_UserIdOrderByTransactionDateDesc(userId);
+    }
+
+    @Override
+    public List<Transaction> getTransactionsForReport(Long userId, LocalDate startDate, LocalDate endDate, Long walletId) {
+        LocalDateTime startDateTime = startDate != null ? startDate.atStartOfDay() : null;
+        LocalDateTime endDateTime = endDate != null ? endDate.atTime(LocalTime.MAX) : null;
+        return transactionRepository.findTransactionsForReport(requireUserId(userId), startDateTime, endDateTime, walletId);
+    }
+
+    private long requireUserId(Long userId) {
+        return Objects.requireNonNull(userId, "UserId không hợp lệ");
+    }
+
+    private long requireId(Long id, String message) {
+        return Objects.requireNonNull(id, message);
     }
 }
