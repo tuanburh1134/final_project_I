@@ -93,6 +93,15 @@ public class User {
         this.userId = userId;
     }
 
+    // Compatibility getters/setters for legacy code
+    public Long getId() {
+        return userId;
+    }
+
+    public void setId(Long id) {
+        this.userId = id;
+    }
+
     public String getFullName() {
         return fullName;
     }
@@ -115,6 +124,14 @@ public class User {
 
     public void setPasswordHash(String passwordHash) {
         this.passwordHash = passwordHash;
+    }
+
+    public String getPassword() {
+        return passwordHash;
+    }
+
+    public void setPassword(String password) {
+        this.passwordHash = password;
     }
 
     public String getProvider() {
@@ -219,5 +236,72 @@ public class User {
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    // ===== Builder (for backward compatibility) =====
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    public static class Builder {
+        private Long userId;
+        private String fullName;
+        private String email;
+        private String password;
+        private String provider;
+        private boolean enabled;
+        private String avatar;
+        private Role role = Role.USER;
+        private boolean locked;
+        private boolean googleAccount;
+        private boolean firstLogin;
+        private String resetToken;
+        private LocalDateTime resetTokenExpiredAt;
+        private boolean deleted;
+        private LocalDateTime lastActiveAt;
+        private LocalDateTime createdAt;
+        private LocalDateTime updatedAt;
+
+        public Builder userId(Long userId) { this.userId = userId; return this; }
+        public Builder fullName(String fullName) { this.fullName = fullName; return this; }
+        public Builder email(String email) { this.email = email; return this; }
+        public Builder password(String password) { this.password = password; return this; }
+        public Builder provider(String provider) { this.provider = provider; return this; }
+        public Builder enabled(boolean enabled) { this.enabled = enabled; return this; }
+        public Builder avatar(String avatar) { this.avatar = avatar; return this; }
+        public Builder role(Role role) { this.role = role; return this; }
+        public Builder locked(boolean locked) { this.locked = locked; return this; }
+        public Builder googleAccount(boolean googleAccount) { this.googleAccount = googleAccount; return this; }
+        public Builder firstLogin(boolean firstLogin) { this.firstLogin = firstLogin; return this; }
+        public Builder resetToken(String resetToken) { this.resetToken = resetToken; return this; }
+        public Builder resetTokenExpiredAt(LocalDateTime resetTokenExpiredAt) { this.resetTokenExpiredAt = resetTokenExpiredAt; return this; }
+        public Builder deleted(boolean deleted) { this.deleted = deleted; return this; }
+        public Builder lastActiveAt(LocalDateTime lastActiveAt) { this.lastActiveAt = lastActiveAt; return this; }
+        public Builder createdAt(LocalDateTime createdAt) { this.createdAt = createdAt; return this; }
+        public Builder updatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; return this; }
+
+        public User build() {
+            User user = new User();
+            user.setUserId(userId);
+            user.setFullName(fullName);
+            user.setEmail(email);
+            if (password != null) {
+                user.setPassword(password);
+            }
+            user.setProvider(provider);
+            user.setEnabled(enabled);
+            user.setAvatar(avatar);
+            user.setRole(role);
+            user.setLocked(locked);
+            user.setGoogleAccount(googleAccount);
+            user.setFirstLogin(firstLogin);
+            user.setResetToken(resetToken);
+            user.setResetTokenExpiredAt(resetTokenExpiredAt);
+            user.setDeleted(deleted);
+            user.setLastActiveAt(lastActiveAt);
+            user.setCreatedAt(createdAt);
+            user.setUpdatedAt(updatedAt);
+            return user;
+        }
     }
 }
