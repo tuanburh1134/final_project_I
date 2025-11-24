@@ -25,6 +25,7 @@ public class EmailService {
 
     @Value("${app.mail.mock:false}")
     private boolean mockMode;
+    private String supportFeedbackEmail;
 
     // Hàm gửi chung
     private void send(String to, String subject, String content) {
