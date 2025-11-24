@@ -1,6 +1,7 @@
 package com.example.financeapp.transaction.controller;
 
 import com.example.financeapp.transaction.dto.CreateTransactionRequest;
+import com.example.financeapp.transaction.dto.DailyReminderResponse;
 import com.example.financeapp.transaction.dto.UpdateTransactionRequest;
 import com.example.financeapp.transaction.entity.Transaction;
 import com.example.financeapp.user.entity.User;
@@ -108,5 +109,12 @@ public class TransactionController {
             res.put("error", e.getMessage());
             return ResponseEntity.status(500).body(res);
         }
+    }
+
+    @GetMapping("/reminder")
+    public ResponseEntity<DailyReminderResponse> getDailyReminder() {
+        Long userId = getCurrentUserId();
+        DailyReminderResponse reminder = transactionService.getDailyReminder(userId);
+        return ResponseEntity.ok(reminder);
     }
 }

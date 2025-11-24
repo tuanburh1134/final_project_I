@@ -1,6 +1,7 @@
 package com.example.financeapp.transaction.service;
 
 import com.example.financeapp.transaction.dto.CreateTransactionRequest;
+import com.example.financeapp.transaction.dto.DailyReminderResponse;
 import com.example.financeapp.transaction.dto.UpdateTransactionRequest;
 import com.example.financeapp.transaction.entity.Transaction;
 
@@ -12,4 +13,5 @@ public interface TransactionService {
     Transaction updateTransaction(Long userId, Long transactionId, UpdateTransactionRequest request);
     void deleteTransaction(Long userId, Long transactionId);
     List<Transaction> getAllTransactions(Long userId);
+    DailyReminderResponse getDailyReminder(Long userId);
 }

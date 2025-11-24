@@ -1,8 +1,10 @@
 package com.example.financeapp.transaction.service.impl;
 
+import com.example.financeapp.budget.service.BudgetService;
 import com.example.financeapp.category.entity.Category;
 import com.example.financeapp.category.repository.CategoryRepository;
 import com.example.financeapp.transaction.dto.CreateTransactionRequest;
+import com.example.financeapp.transaction.dto.DailyReminderResponse;
 import com.example.financeapp.transaction.dto.UpdateTransactionRequest;
 import com.example.financeapp.transaction.entity.Transaction;
 import com.example.financeapp.transaction.entity.TransactionType;
@@ -19,6 +21,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -30,6 +34,7 @@ public class TransactionServiceImpl implements TransactionService {
     @Autowired private TransactionTypeRepository typeRepository;
     @Autowired private CategoryRepository categoryRepository;
     @Autowired private WalletMemberRepository walletMemberRepository;
+    @Autowired private BudgetService budgetService;
 
     private Transaction createTransaction(Long userId, CreateTransactionRequest req, String typeName) {
         // 1. Kiểm tra user tồn tại
@@ -100,7 +105,9 @@ public class TransactionServiceImpl implements TransactionService {
         tx.setNote(req.getNote());
         tx.setImageUrl(req.getImageUrl());
 
-        return transactionRepository.save(tx);
+        Transaction savedTx = transactionRepository.save(tx);
+        budgetService.evaluateBudgetAfterTransaction(userId, savedTx);
+        return savedTx;
     }
 
     @Override
@@ -141,8 +148,9 @@ public class TransactionServiceImpl implements TransactionService {
         transaction.setNote(request.getNote());
         transaction.setImageUrl(request.getImageUrl());
 
-        // 6. Lưu lại (updatedAt sẽ tự động cập nhật nhờ @PreUpdate)
-        return transactionRepository.save(transaction);
+        Transaction saved = transactionRepository.save(transaction);
+        budgetService.evaluateBudgetAfterTransaction(userId, saved);
+        return saved;
     }
 
     @Override
@@ -190,5 +198,34 @@ public class TransactionServiceImpl implements TransactionService {
     @Override
     public List<Transaction> getAllTransactions(Long userId) {
         return transactionRepository.findByUser_UserIdOrderByTransactionDateDesc(userId);
+    }
+
+    @Override
+    public DailyReminderResponse getDailyReminder(Long userId) {
+        LocalDate today = LocalDate.now();
+        LocalDateTime startOfDay = today.atStartOfDay();
+        LocalDateTime endOfDay = today.plusDays(1).atStartOfDay();
+
+        boolean hasTransactionToday = transactionRepository
+                .existsByUser_UserIdAndTransactionDateBetween(userId, startOfDay, endOfDay);
+
+        Transaction lastTransaction = transactionRepository.findTopByUser_UserIdOrderByTransactionDateDesc(userId);
+
+        String message;
+        if (hasTransactionToday) {
+            message = "Bạn đã ghi giao dịch hôm nay. Tiếp tục duy trì nhé!";
+        } else if (lastTransaction == null) {
+            message = "Bạn chưa ghi nhận giao dịch nào. Bắt đầu ngay để quản lý tài chính tốt hơn.";
+        } else {
+            long days = java.time.Duration.between(lastTransaction.getTransactionDate(), LocalDateTime.now()).toDays();
+            if (days >= 1) {
+                message = "Đã " + days + " ngày bạn chưa ghi giao dịch. Hãy cập nhật thu chi hôm nay!";
+            } else {
+                message = "Hãy ghi lại các khoản thu chi hôm nay để không bỏ lỡ.";
+            }
+        }
+
+        return new DailyReminderResponse(!hasTransactionToday, message,
+                lastTransaction != null ? lastTransaction.getTransactionDate() : null);
     }
 }

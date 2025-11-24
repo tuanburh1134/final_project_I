@@ -119,18 +119,18 @@ public class AuthService {
             );
         });
 
-        User user = User.builder()
-                .email(email)
-                .fullName(request.getFullName())  // nếu muốn thì .trim() thêm cũng được
-                .password(passwordEncoder.encode(request.getPassword()))
-                .role(Role.USER)
-                .googleAccount(false)
-                .firstLogin(false)
-                .locked(false)
-                .deleted(false)
-                .createdAt(LocalDateTime.now())
-                .lastActiveAt(LocalDateTime.now())
-                .build();
+        User user = new User();
+        user.setEmail(email);
+        user.setFullName(request.getFullName());
+        user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
+        user.setRole(Role.USER);
+        user.setGoogleAccount(false);
+        user.setFirstLogin(false);
+        user.setLocked(false);
+        user.setDeleted(false);
+        user.setEnabled(true);
+        user.setCreatedAt(LocalDateTime.now());
+        user.setLastActiveAt(LocalDateTime.now());
 
         userRepository.save(user);
 
@@ -164,13 +164,13 @@ public class AuthService {
         }
 
         // ❌ Google account chưa đặt mật khẩu
-        if (user.isGoogleAccount() && (user.getPassword() == null || user.getPassword().isEmpty())) {
+        if (user.isGoogleAccount() && (user.getPasswordHash() == null || user.getPasswordHash().isEmpty())) {
             throw new ApiException(ApiErrorCode.GOOGLE_ACCOUNT_ONLY,
                     "Tài khoản Google – hãy đăng nhập Google");
         }
 
         // ❌ sai mật khẩu
-        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+        if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
             throw new ApiException(ApiErrorCode.INVALID_CREDENTIALS,
                     "Sai mật khẩu");
         }
@@ -180,7 +180,7 @@ public class AuthService {
         userRepository.save(user);
 
         String token = jwtTokenProvider.generateToken(new CustomUserDetails(user));
-        return new LoginResult(user.getId(), token);
+        return new LoginResult(user.getUserId(), token);
     }
 
     // ============================================================
@@ -199,7 +199,7 @@ public class AuthService {
                     "Tài khoản đã bị xóa hoặc không hoạt động 30 ngày");
         }
 
-        if (user.isGoogleAccount() && user.getPassword() == null) {
+        if (user.isGoogleAccount() && user.getPasswordHash() == null) {
             throw new ApiException(ApiErrorCode.GOOGLE_ACCOUNT_ONLY,
                     "Tài khoản Google – không thể reset mật khẩu");
         }
@@ -283,12 +283,12 @@ public class AuthService {
         }
 
         // không cho đặt giống mật khẩu cũ
-        if (passwordEncoder.matches(request.getNewPassword(), user.getPassword())) {
+        if (passwordEncoder.matches(request.getNewPassword(), user.getPasswordHash())) {
             throw new ApiException(ApiErrorCode.PASSWORD_SAME_AS_OLD,
                     "Mật khẩu mới trùng mật khẩu cũ");
         }
 
-        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
         user.setResetToken(null);
         user.setResetTokenExpiredAt(null);
 
@@ -302,22 +302,22 @@ public class AuthService {
     public void changePassword(ChangePasswordRequest request, CustomUserDetails currentUser) {
         User user = currentUser.getUser();
 
-        if (user.isGoogleAccount() && (user.getPassword() == null || user.isFirstLogin())) {
+        if (user.isGoogleAccount() && (user.getPasswordHash() == null || user.isFirstLogin())) {
             throw new ApiException(ApiErrorCode.GOOGLE_ACCOUNT_ONLY,
                     "Tài khoản Google chưa đặt mật khẩu lần đầu");
         }
 
-        if (!passwordEncoder.matches(request.getOldPassword(), user.getPassword())) {
+        if (!passwordEncoder.matches(request.getOldPassword(), user.getPasswordHash())) {
             throw new ApiException(ApiErrorCode.INVALID_CREDENTIALS,
                     "Mật khẩu cũ sai");
         }
 
-        if (passwordEncoder.matches(request.getNewPassword(), user.getPassword())) {
+        if (passwordEncoder.matches(request.getNewPassword(), user.getPasswordHash())) {
             throw new ApiException(ApiErrorCode.PASSWORD_SAME_AS_OLD,
                     "Mật khẩu mới trùng mật khẩu cũ");
         }
 
-        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
         user.setFirstLogin(false);
 
         userRepository.save(user);
@@ -340,19 +340,18 @@ public class AuthService {
         User user = userRepository.findByEmail(email).orElse(null);
 
         if (user == null) {
-            // Lần đầu login Google
-            user = User.builder()
-                    .email(email)
-                    .fullName(info.getName())
-                    .avatar(info.getPicture())
-                    .googleAccount(true)
-                    .firstLogin(true)
-                    .role(Role.USER)
-                    .locked(false)
-                    .deleted(false)
-                    .createdAt(LocalDateTime.now())
-                    .lastActiveAt(LocalDateTime.now())
-                    .build();
+            user = new User();
+            user.setEmail(email);
+            user.setFullName(info.getName());
+            user.setAvatar(info.getPicture());
+            user.setGoogleAccount(true);
+            user.setFirstLogin(true);
+            user.setRole(Role.USER);
+            user.setLocked(false);
+            user.setDeleted(false);
+            user.setEnabled(true);
+            user.setCreatedAt(LocalDateTime.now());
+            user.setLastActiveAt(LocalDateTime.now());
         } else {
 
             // ❌ nếu user đã bị xóa → chặn login
@@ -385,7 +384,7 @@ public class AuthService {
         userRepository.save(user);
 
         String token = jwtTokenProvider.generateToken(new CustomUserDetails(user));
-        return new LoginResult(user.getId(), token);
+        return new LoginResult(user.getUserId(), token);
     }
 
     // ============================================================
@@ -406,13 +405,13 @@ public class AuthService {
                     "Tài khoản đã có mật khẩu, không phải lần đầu");
         }
 
-        if (user.getPassword() != null &&
-                passwordEncoder.matches(request.getNewPassword(), user.getPassword())) {
+        if (user.getPasswordHash() != null &&
+                passwordEncoder.matches(request.getNewPassword(), user.getPasswordHash())) {
             throw new ApiException(ApiErrorCode.PASSWORD_SAME_AS_OLD,
                     "Không được đặt mật khẩu trùng mật khẩu cũ");
         }
 
-        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
         user.setFirstLogin(false);
 
         userRepository.save(user);

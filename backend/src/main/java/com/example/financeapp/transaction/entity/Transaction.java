@@ -58,6 +58,12 @@ public class Transaction {
     @Column(name = "merge_date")
     private LocalDateTime mergeDate; // Ngày gộp ví (để biết transaction từ merge)
 
+    @Column(name = "over_budget")
+    private boolean overBudget = false;
+
+    @Column(name = "over_budget_amount", precision = 20, scale = 8)
+    private BigDecimal overBudgetAmount = BigDecimal.ZERO;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt = LocalDateTime.now();
 
@@ -114,4 +120,20 @@ public class Transaction {
 
     public LocalDateTime getMergeDate() { return mergeDate; }
     public void setMergeDate(LocalDateTime mergeDate) { this.mergeDate = mergeDate; }
+
+    public boolean isOverBudget() {
+        return overBudget;
+    }
+
+    public void setOverBudget(boolean overBudget) {
+        this.overBudget = overBudget;
+    }
+
+    public BigDecimal getOverBudgetAmount() {
+        return overBudgetAmount;
+    }
+
+    public void setOverBudgetAmount(BigDecimal overBudgetAmount) {
+        this.overBudgetAmount = overBudgetAmount;
+    }
 }

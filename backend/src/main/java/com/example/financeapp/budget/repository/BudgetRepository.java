@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
+import java.util.List;
 
 public interface BudgetRepository extends JpaRepository<Budget, Long> {
 
@@ -54,5 +55,20 @@ public interface BudgetRepository extends JpaRepository<Budget, Long> {
             @Param("walletId") Long walletId,
             @Param("newStartDate") LocalDate newStartDate,
             @Param("newEndDate") LocalDate newEndDate
+    );
+
+    List<Budget> findByUserOrderByStartDateDesc(User user);
+
+    @Query("""
+            SELECT b FROM Budget b
+            WHERE b.user = :user
+              AND b.category.categoryId = :categoryId
+              AND b.startDate <= :date
+              AND b.endDate >= :date
+            """)
+    List<Budget> findActiveBudgets(
+            @Param("user") User user,
+            @Param("categoryId") Long categoryId,
+            @Param("date") LocalDate date
     );
 }
