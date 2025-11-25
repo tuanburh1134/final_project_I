@@ -16,11 +16,11 @@ public class WalletMember {
     @Column(name = "member_id")
     private Long memberId;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY) // Nên thêm LAZY để tối ưu hiệu năng
     @JoinColumn(name = "wallet_id", nullable = false)
     private Wallet wallet;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY) // Nên thêm LAZY
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
@@ -31,22 +31,44 @@ public class WalletMember {
     @Column(name = "joined_at")
     private LocalDateTime joinedAt = LocalDateTime.now();
 
+    // Field mới
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 20)
+    private MemberStatus status = MemberStatus.PENDING; // Mặc định là Pending
+
+    // Enum trạng thái
+    public enum MemberStatus {
+        PENDING,
+        ACCEPTED
+    }
+
     // Enum cho roles
     public enum WalletRole {
-        OWNER,  // Chủ ví: Full quyền, không ai được đụng vào
-        ADMIN,  // Quản lý: Quản lý thành viên (trừ Owner), sửa ví
-        EDITOR, // Thành viên: Thêm/Sửa/Xóa giao dịch
-        VIEWER  // Người xem: Chỉ xem, không thao tác
+        OWNER,
+        ADMIN,
+        EDITOR,
+        VIEWER
     }
 
     // Constructors
     public WalletMember() {
     }
 
+    // --- SỬA LỖI 1: Constructor đầy đủ 4 tham số (Dùng cho tính năng mời thành viên) ---
+    public WalletMember(Wallet wallet, User user, WalletRole role, MemberStatus status) {
+        this.wallet = wallet;
+        this.user = user;
+        this.role = role;
+        this.status = status;
+        this.joinedAt = LocalDateTime.now();
+    }
+
+    // --- SỬA LỖI 2: Constructor 3 tham số (Dùng cho Owner khi tạo ví) ---
     public WalletMember(Wallet wallet, User user, WalletRole role) {
         this.wallet = wallet;
         this.user = user;
         this.role = role;
+        this.status = MemberStatus.ACCEPTED; // Mặc định Accepted nếu dùng constructor này
         this.joinedAt = LocalDateTime.now();
     }
 
@@ -91,6 +113,14 @@ public class WalletMember {
         this.joinedAt = joinedAt;
     }
 
+    public MemberStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(MemberStatus status) {
+        this.status = status;
+    }
+
     // Helper methods
     public boolean isOwner() {
         return this.role == WalletRole.OWNER;
@@ -104,4 +134,3 @@ public class WalletMember {
 
     public boolean isViewer() {return this.role == WalletRole.VIEWER;}
 }
-

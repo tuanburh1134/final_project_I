@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import com.example.financeapp.wallet.entity.WalletMember.MemberStatus;
 
 import java.util.List;
 import java.util.Optional;
@@ -13,14 +14,11 @@ import java.util.Optional;
 @Repository
 public interface WalletMemberRepository extends JpaRepository<WalletMember, Long> {
 
+    List<WalletMember> findByUser_UserIdAndStatus(Long userId, MemberStatus status);
+
+    List<WalletMember> findByUser_UserIdAndStatusOrderByJoinedAtDesc(Long userId, MemberStatus status);
     // Tìm tất cả members của một wallet
     List<WalletMember> findByWallet_WalletId(Long walletId);
-
-    // Tìm tất cả wallets mà user là member (bao gồm owner)
-    List<WalletMember> findByUser_UserId(Long userId);
-
-    // Tìm tất cả wallets mà user là owner
-    List<WalletMember> findByUser_UserIdAndRole(Long userId, WalletRole role);
 
     // Kiểm tra user có phải member của wallet không
     boolean existsByWallet_WalletIdAndUser_UserId(Long walletId, Long userId);

@@ -45,6 +45,9 @@ public interface WalletService {
     boolean isOwner(Long walletId, Long userId);
 
     // --- MERGE WALLETS ---
+    List<SharedWalletDTO> getPendingInvitations(Long userId);
+    void respondToInvitation(Long userId, Long walletId, boolean isAccepted);
+
     List<MergeCandidateDTO> getMergeCandidates(Long userId, Long sourceWalletId);
 
     MergeWalletPreviewResponse previewMerge(Long userId, Long sourceWalletId, Long targetWalletId, String targetCurrency);

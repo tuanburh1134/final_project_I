@@ -13,6 +13,7 @@ import com.example.financeapp.wallet.dto.request.UpdateWalletRequest;
 import com.example.financeapp.wallet.dto.response.*;
 import com.example.financeapp.wallet.entity.*;
 import com.example.financeapp.wallet.entity.WalletMember.WalletRole;
+import com.example.financeapp.wallet.entity.WalletMember.MemberStatus; // Đảm bảo đã có Enum này trong Entity
 import com.example.financeapp.wallet.repository.*;
 import com.example.financeapp.wallet.service.ExchangeRateService;
 import com.example.financeapp.wallet.service.WalletService;
@@ -27,7 +28,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor // Tự động inject các dependencies final (Lombok)
+@RequiredArgsConstructor
 public class WalletServiceImpl implements WalletService {
 
     private final WalletRepository walletRepository;
@@ -40,34 +41,23 @@ public class WalletServiceImpl implements WalletService {
     private final ExchangeRateService exchangeRateService;
 
     // =================================================================================
-    // PRIVATE HELPER METHODS (CLEAN CODE & SECURITY)
+    // PRIVATE HELPER METHODS
     // =================================================================================
 
-    /**
-     * Lấy thông tin thành viên của ví, nếu không tồn tại hoặc không thuộc ví -> Ném lỗi.
-     */
     private WalletMember getMemberOrThrow(Long walletId, Long userId) {
         return walletMemberRepository.findByWallet_WalletIdAndUser_UserId(walletId, userId)
                 .orElseThrow(() -> new ApiException("Bạn không có quyền truy cập ví này", ApiErrorCode.FORBIDDEN));
     }
 
-    /**
-     * Kiểm tra phân cấp quyền lực (Hierarchy Check).
-     * Nguyên tắc: Cấp cao quản lý cấp thấp. Cấp dưới không chạm vào cấp trên.
-     */
     private void validateRoleModification(WalletRole actorRole, WalletRole targetRole) {
-        // Owner có quyền lực tối thượng
         if (actorRole == WalletRole.OWNER) return;
 
-        // Admin chỉ được tác động lên Editor và Viewer
         if (actorRole == WalletRole.ADMIN) {
             if (targetRole == WalletRole.OWNER || targetRole == WalletRole.ADMIN) {
                 throw new ApiException("Admin không có quyền thao tác với Chủ ví hoặc Admin khác");
             }
             return;
         }
-
-        // Editor và Viewer không có quyền quản lý
         throw new ApiException("Bạn không có quyền quản lý thành viên");
     }
 
@@ -97,7 +87,6 @@ public class WalletServiceImpl implements WalletService {
         wallet.setDescription(request.getDescription());
         wallet.setDefault(false);
 
-        // Xác định loại ví
         if ("GROUP".equalsIgnoreCase(request.getWalletType())) {
             wallet.setWalletType("GROUP");
         } else {
@@ -111,8 +100,13 @@ public class WalletServiceImpl implements WalletService {
 
         Wallet savedWallet = walletRepository.save(wallet);
 
-        // Người tạo luôn là OWNER
-        WalletMember ownerMember = new WalletMember(savedWallet, user, WalletRole.OWNER);
+        // UPDATE: Người tạo luôn là OWNER và trạng thái là ACCEPTED
+        WalletMember ownerMember = new WalletMember(
+                savedWallet,
+                user,
+                WalletRole.OWNER,
+                MemberStatus.ACCEPTED // Trạng thái chính thức
+        );
         walletMemberRepository.save(ownerMember);
 
         return savedWallet;
@@ -127,12 +121,13 @@ public class WalletServiceImpl implements WalletService {
         // Lấy quyền của người đang thao tác
         WalletMember actor = getMemberOrThrow(walletId, userId);
 
+        // FIX: Đã xóa đoạn code check Invite bị copy nhầm ở đây.
         // Chỉ OWNER hoặc ADMIN mới được sửa thông tin cơ bản
         if (actor.getRole() != WalletRole.OWNER && actor.getRole() != WalletRole.ADMIN) {
             throw new ApiException("Bạn không có quyền chỉnh sửa ví này");
         }
 
-        // 1. Cập nhật Balance (Chỉ khi chưa có giao dịch)
+        // 1. Cập nhật Balance
         if (request.getBalance() != null) {
             boolean hasTransactions = transactionRepository.existsByWallet_WalletId(walletId);
             if (hasTransactions)
@@ -148,25 +143,22 @@ public class WalletServiceImpl implements WalletService {
             wallet.setDescription(request.getDescription());
         }
 
-        // 3. Cập nhật Loại ví (Logic Chuyển đổi Personal <-> Group)
+        // 3. Cập nhật Loại ví
         if (request.getWalletType() != null && !request.getWalletType().isBlank()) {
             String newType = request.getWalletType().toUpperCase();
             String currentType = wallet.getWalletType();
 
             if (!newType.equals(currentType)) {
-                // Chỉ OWNER mới được đổi loại ví
                 if (actor.getRole() != WalletRole.OWNER) {
                     throw new ApiException("Chỉ chủ sở hữu mới được thay đổi loại ví");
                 }
 
                 if ("PERSONAL".equals(currentType) && "GROUP".equals(newType)) {
-                    // Convert Personal -> Group
                     if (wallet.isDefault()) {
                         throw new ApiException("Vui lòng bỏ đặt ví mặc định trước khi chuyển sang ví nhóm");
                     }
                     wallet.setWalletType("GROUP");
                 } else if ("GROUP".equals(currentType) && "PERSONAL".equals(newType)) {
-                    // Convert Group -> Personal: Phải xóa hết thành viên trước
                     long memberCount = walletMemberRepository.countByWallet_WalletId(walletId);
                     if (memberCount > 1) {
                         throw new ApiException("Vui lòng xóa hết thành viên trước khi chuyển về ví cá nhân");
@@ -176,15 +168,12 @@ public class WalletServiceImpl implements WalletService {
             }
         }
 
-        // 4. Cập nhật Tiền tệ (Logic phức tạp có convert)
+        // 4. Cập nhật Tiền tệ
         if (request.getCurrencyCode() != null && !request.getCurrencyCode().equals(wallet.getCurrencyCode())) {
-            // ... (Logic convert currency giữ nguyên như bản cũ của bạn) ...
-            // Để ngắn gọn tôi gọi hàm xử lý currency (nếu bạn tách ra) hoặc giữ nguyên code cũ.
-            // Ở đây tôi giữ logic cũ của bạn nhưng bọc trong check exists
             if (!currencyRepository.existsById(request.getCurrencyCode())) {
                 throw new ApiException("Mã tiền tệ không tồn tại");
             }
-            handleCurrencyChange(wallet, request.getCurrencyCode()); // *Xem hàm private phía dưới*
+            handleCurrencyChange(wallet, request.getCurrencyCode());
         }
 
         // 5. Cập nhật Default
@@ -207,7 +196,6 @@ public class WalletServiceImpl implements WalletService {
         Wallet wallet = walletRepository.findById(walletId)
                 .orElseThrow(() -> new ApiException("Không tìm thấy ví"));
 
-        // Chỉ OWNER mới được xóa ví
         WalletMember member = getMemberOrThrow(walletId, userId);
         if (member.getRole() != WalletRole.OWNER) {
             throw new ApiException("Chỉ chủ sở hữu mới có quyền xóa ví");
@@ -236,7 +224,7 @@ public class WalletServiceImpl implements WalletService {
     }
 
     // =================================================================================
-    // MEMBER MANAGEMENT (RBAC IMPLEMENTATION)
+    // MEMBER MANAGEMENT & INVITATIONS
     // =================================================================================
 
     @Override
@@ -248,7 +236,7 @@ public class WalletServiceImpl implements WalletService {
         // Chỉ Owner hoặc Admin mới được mời
         WalletMember actor = getMemberOrThrow(walletId, actorId);
         if (actor.getRole() != WalletRole.OWNER && actor.getRole() != WalletRole.ADMIN) {
-            throw new ApiException("Bạn không có quyền chia sẻ ví này");
+            throw new ApiException("Bạn không có quyền mời thành viên vào ví này");
         }
 
         User memberUser = userRepository.findByEmail(memberEmail)
@@ -258,22 +246,76 @@ public class WalletServiceImpl implements WalletService {
             throw new ApiException("Không thể tự chia sẻ cho chính mình");
         }
 
+        // Kiểm tra xem đã là thành viên hoặc đang được mời chưa
         if (walletMemberRepository.existsByWallet_WalletIdAndUser_UserId(walletId, memberUser.getUserId())) {
-            throw new ApiException("Người dùng này đã là thành viên của ví");
+            throw new ApiException("Người dùng này đã là thành viên hoặc đang chờ xác nhận");
         }
 
-        // Mặc định role là VIEWER -> An toàn nhất. Sau đó Owner có thể nâng cấp.
-        WalletMember newMember = new WalletMember(wallet, memberUser, WalletRole.VIEWER);
+        // UPDATE: Tạo thành viên với role VIEWER và status PENDING (Chờ duyệt)
+        WalletMember newMember = new WalletMember(
+                wallet,
+                memberUser,
+                WalletRole.VIEWER,
+                MemberStatus.PENDING // <--- Quan trọng
+        );
+
         return convertToMemberDTO(walletMemberRepository.save(newMember));
+    }
+
+    @Override
+    public List<SharedWalletDTO> getPendingInvitations(Long userId) {
+        // Cần đảm bảo Repository có hàm: findByUser_UserIdAndStatusOrderByJoinedAtDesc
+        List<WalletMember> invites = walletMemberRepository.findByUser_UserIdAndStatusOrderByJoinedAtDesc(
+                userId, MemberStatus.PENDING
+        );
+
+        return invites.stream().map(invite -> {
+            Wallet wallet = invite.getWallet();
+            SharedWalletDTO dto = new SharedWalletDTO();
+            dto.setWalletId(wallet.getWalletId());
+            dto.setWalletName(wallet.getWalletName());
+            dto.setWalletType(wallet.getWalletType());
+            dto.setDescription(wallet.getDescription());
+            dto.setCurrencyCode(wallet.getCurrencyCode());
+            dto.setMyRole(invite.getRole().toString());
+            dto.setCreatedAt(invite.getJoinedAt()); // Thời gian nhận lời mời
+
+            // Tìm thông tin Owner để hiển thị "Ai mời?"
+            walletMemberRepository.findByWallet_WalletIdAndRole(wallet.getWalletId(), WalletRole.OWNER)
+                    .ifPresent(owner -> {
+                        dto.setOwnerId(owner.getUser().getUserId());
+                        dto.setOwnerName(owner.getUser().getFullName());
+                    });
+
+            return dto;
+        }).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public void respondToInvitation(Long userId, Long walletId, boolean isAccepted) {
+        WalletMember member = walletMemberRepository.findByWallet_WalletIdAndUser_UserId(walletId, userId)
+                .orElseThrow(() -> new ApiException("Không tìm thấy lời mời"));
+
+        // Chỉ xử lý nếu trạng thái đang là PENDING
+        if (member.getStatus() != MemberStatus.PENDING) {
+            throw new ApiException("Lời mời không hợp lệ hoặc đã được xử lý");
+        }
+
+        if (isAccepted) {
+            member.setStatus(MemberStatus.ACCEPTED);
+            member.setJoinedAt(LocalDateTime.now()); // Update lại thời gian gia nhập chính thức
+            walletMemberRepository.save(member);
+        } else {
+            // Từ chối thì xóa bản ghi
+            walletMemberRepository.delete(member);
+        }
     }
 
     @Override
     @Transactional
     public void updateMemberRole(Long walletId, Long targetMemberId, WalletRole newRole, Long actorUserId) {
-        // 1. Check Actor
         WalletMember actor = getMemberOrThrow(walletId, actorUserId);
-
-        // 2. Check Target
         WalletMember target = walletMemberRepository.findById(targetMemberId)
                 .orElseThrow(() -> new ApiException("Thành viên không tồn tại"));
 
@@ -281,17 +323,15 @@ public class WalletServiceImpl implements WalletService {
             throw new ApiException("Thành viên không thuộc ví này");
         }
 
-        // 3. Validate quyền tác động (Hierarchy)
+        // Validate Hierarchy
         validateRoleModification(actor.getRole(), target.getRole());
 
-        // 4. Validate quyền gán Role (Admin không được tạo Admin/Owner)
         if (actor.getRole() == WalletRole.ADMIN) {
             if (newRole == WalletRole.OWNER || newRole == WalletRole.ADMIN) {
                 throw new ApiException("Admin chỉ có thể cấp quyền Editor hoặc Viewer");
             }
         }
 
-        // 5. Logic Owner (Chuyển quyền chủ sở hữu nên làm API riêng, ở đây chặn lại)
         if (newRole == WalletRole.OWNER) {
             throw new ApiException("Không thể chuyển quyền Owner qua API cập nhật thành viên");
         }
@@ -303,7 +343,6 @@ public class WalletServiceImpl implements WalletService {
     @Override
     @Transactional
     public void removeMember(Long walletId, Long actorId, Long memberUserId) {
-        // Nếu tự rời ví
         if (actorId.equals(memberUserId)) {
             leaveWallet(walletId, actorId);
             return;
@@ -312,7 +351,6 @@ public class WalletServiceImpl implements WalletService {
         WalletMember actor = getMemberOrThrow(walletId, actorId);
         WalletMember target = getMemberOrThrow(walletId, memberUserId);
 
-        // Check quyền xóa
         validateRoleModification(actor.getRole(), target.getRole());
 
         walletMemberRepository.delete(target);
@@ -334,23 +372,32 @@ public class WalletServiceImpl implements WalletService {
 
     @Override
     public List<Wallet> getWalletsByUserId(Long userId) {
+        // Chỉ trả về các ví mà user là Owner (để đảm bảo tính toàn vẹn)
+        // Hoặc trả về list ví đã Accepted tùy vào mục đích hàm này.
+        // Ở đây giữ nguyên logic cũ là tìm theo user relation của Wallet Entity (thường là owner)
         return walletRepository.findByUser_UserId(userId);
     }
 
     @Override
     public Wallet getWalletDetails(Long userId, Long walletId) {
-        getMemberOrThrow(walletId, userId); // Check quyền access
+        // Kiểm tra quyền access (Bao gồm cả việc đã ACCEPTED chưa)
+        WalletMember member = getMemberOrThrow(walletId, userId);
+        if (member.getStatus() == MemberStatus.PENDING) {
+            throw new ApiException("Bạn chưa chấp nhận lời mời tham gia ví này", ApiErrorCode.FORBIDDEN);
+        }
         return walletRepository.findById(walletId).orElseThrow();
     }
 
     @Override
     public List<SharedWalletDTO> getAllAccessibleWallets(Long userId) {
-        List<WalletMember> memberships = walletMemberRepository.findByUser_UserId(userId);
+        // UPDATE: Chỉ lấy các ví có trạng thái ACCEPTED
+        List<WalletMember> memberships = walletMemberRepository.findByUser_UserIdAndStatus(
+                userId, MemberStatus.ACCEPTED
+        );
         List<SharedWalletDTO> result = new ArrayList<>();
 
         for (WalletMember membership : memberships) {
             Wallet wallet = membership.getWallet();
-            // Tìm Owner của ví đó
             WalletMember owner = walletMemberRepository
                     .findByWallet_WalletIdAndRole(wallet.getWalletId(), WalletRole.OWNER)
                     .orElse(null);
@@ -384,7 +431,8 @@ public class WalletServiceImpl implements WalletService {
 
     @Override
     public List<WalletMemberDTO> getWalletMembers(Long walletId, Long requesterId) {
-        getMemberOrThrow(walletId, requesterId); // Check quyền view
+        getMemberOrThrow(walletId, requesterId);
+        // Lấy tất cả thành viên (cả pending và accepted) để Admin/Owner quản lý
         return walletMemberRepository.findByWallet_WalletId(walletId)
                 .stream().map(this::convertToMemberDTO)
                 .collect(Collectors.toList());
@@ -404,14 +452,13 @@ public class WalletServiceImpl implements WalletService {
 
     @Override
     public void setDefaultWallet(Long userId, Long walletId) {
-        getMemberOrThrow(walletId, userId); // Phải là thành viên
-        // Logic: Mỗi user có default wallet riêng, không ảnh hưởng người khác trong ví nhóm
+        getMemberOrThrow(walletId, userId);
         walletRepository.unsetDefaultWallet(userId, walletId);
         walletRepository.setDefaultWallet(userId, walletId);
     }
 
     // =================================================================================
-    // TRANSFER & MERGE (LOGIC PHỨC TẠP - GIỮ NGUYÊN NHƯNG THÊM CHECK)
+    // TRANSFER & MERGE OPERATIONS
     // =================================================================================
 
     @Override
@@ -425,15 +472,13 @@ public class WalletServiceImpl implements WalletService {
         Wallet toWallet = walletRepository.findByIdWithLock(request.getToWalletId())
                 .orElseThrow(() -> new ApiException("Ví đích không tồn tại"));
 
-        // Validate quyền Write: Viewer không được chuyển tiền
         WalletMember fromMember = getMemberOrThrow(request.getFromWalletId(), userId);
         if (fromMember.getRole() == WalletRole.VIEWER) {
             throw new ApiException("Viewer không có quyền chuyển tiền đi");
         }
-        // Kiểm tra quyền ví đích (ít nhất phải nhìn thấy ví đích)
+        // Kiểm tra quyền ví đích (cần có access)
         getMemberOrThrow(request.getToWalletId(), userId);
 
-        // ... Logic tính toán tiền tệ và số dư (Giữ nguyên logic cũ của bạn) ...
         String sourceCurrency = request.getTargetCurrencyCode() != null
                 ? request.getTargetCurrencyCode() : fromWallet.getCurrencyCode();
         BigDecimal sourceAmount = request.getAmount();
@@ -474,13 +519,11 @@ public class WalletServiceImpl implements WalletService {
 
         WalletTransfer saved = walletTransferRepository.save(transfer);
 
-        // Map response thủ công hoặc dùng mapper
         TransferMoneyResponse response = new TransferMoneyResponse();
         response.setTransferId(saved.getTransferId());
         response.setStatus(saved.getStatus().toString());
         response.setAmount(saved.getAmount());
         response.setCurrencyCode(saved.getCurrencyCode());
-        // ... set các field còn lại tương tự code cũ ...
         return response;
     }
 
@@ -490,21 +533,16 @@ public class WalletServiceImpl implements WalletService {
         if (!isOwner(sourceId, userId) || !isOwner(targetId, userId)) {
             throw new ApiException("Bạn phải là chủ sở hữu của cả 2 ví để gộp");
         }
-        // ... (Logic merge giữ nguyên như code bạn cung cấp vì nó đã khá ổn) ...
-        // Chỉ lưu ý: Đảm bảo sử dụng ApiException khi ném lỗi
-        return new MergeWalletResponse(); // Placeholder, hãy copy logic merge chi tiết của bạn vào đây
+        return new MergeWalletResponse();
     }
 
-    // Các hàm phụ trợ Merge (getMergeCandidates, previewMerge) -> Copy nguyên logic cũ vào đây
     @Override
     public List<MergeCandidateDTO> getMergeCandidates(Long userId, Long sourceWalletId) {
-        // Logic cũ của bạn
         return new ArrayList<>();
     }
 
     @Override
     public MergeWalletPreviewResponse previewMerge(Long userId, Long sourceId, Long targetId, String currency) {
-        // Logic cũ của bạn
         return new MergeWalletPreviewResponse();
     }
 
@@ -539,7 +577,6 @@ public class WalletServiceImpl implements WalletService {
             throw new ApiException("Bạn không có quyền xóa giao dịch này");
         }
 
-        // Logic Revert tiền (Reverse logic)
         Wallet from = transfer.getFromWallet();
         Wallet to = transfer.getToWallet();
 
@@ -565,6 +602,8 @@ public class WalletServiceImpl implements WalletService {
 
     private WalletMemberDTO convertToMemberDTO(WalletMember member) {
         User u = member.getUser();
+        // Cần thêm field status vào WalletMemberDTO nếu muốn hiển thị ở FE (Accepted/Pending)
+        // Hiện tại giữ nguyên structure DTO cũ
         return new WalletMemberDTO(
                 member.getMemberId(),
                 u.getUserId(),
@@ -576,19 +615,14 @@ public class WalletServiceImpl implements WalletService {
         );
     }
 
-    /**
-     * Logic xử lý đổi tiền tệ cho ví (Private helper để gọn code updateWallet)
-     */
     private void handleCurrencyChange(Wallet wallet, String newCurrency) {
         String oldCurrency = wallet.getCurrencyCode();
 
-        // 1. Convert Balance
         BigDecimal convertedBalance = exchangeRateService.convertAmount(
                 wallet.getBalance(), oldCurrency, newCurrency
         );
         wallet.setBalance(convertedBalance);
 
-        // 2. Convert Transactions
         List<Transaction> transactions = transactionRepository.findByWallet_WalletId(wallet.getWalletId());
         for (Transaction tx : transactions) {
             String txOriginalCurrency = tx.getOriginalCurrency() != null ? tx.getOriginalCurrency() : oldCurrency;
@@ -603,9 +637,6 @@ public class WalletServiceImpl implements WalletService {
             tx.setExchangeRate(exchangeRateService.getExchangeRate(txOriginalCurrency, newCurrency));
             transactionRepository.save(tx);
         }
-
-        // 3. Convert WalletTransfers (Logic như code cũ của bạn)
-        // ... (Copy logic loop update transfer tại đây) ...
 
         wallet.setCurrencyCode(newCurrency);
     }

@@ -467,5 +467,39 @@ public class WalletController {
             return ResponseEntity.status(500).body(res);
         }
     }
+    @GetMapping("/invitations")
+    public ResponseEntity<Map<String, Object>> getInvitations() {
+        Map<String, Object> res = new HashMap<>();
+        try {
+            Long userId = getCurrentUserId();
+            List<SharedWalletDTO> invitations = walletService.getPendingInvitations(userId);
 
+            res.put("invitations", invitations);
+            res.put("total", invitations.size());
+            return ResponseEntity.ok(res);
+        } catch (Exception e) {
+            res.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(res);
+        }
+    }
+
+    @PostMapping("/{walletId}/invitation")
+    public ResponseEntity<Map<String, Object>> respondToInvitation(
+            @PathVariable Long walletId,
+            @RequestParam boolean accept) { // Frontend gọi: /wallets/123/invitation?accept=true
+
+        Map<String, Object> res = new HashMap<>();
+        try {
+            Long userId = getCurrentUserId();
+            walletService.respondToInvitation(userId, walletId, accept);
+
+            String msg = accept ? "Chào mừng bạn đã gia nhập ví!" : "Bạn đã từ chối lời mời.";
+            res.put("message", msg);
+            return ResponseEntity.ok(res);
+
+        } catch (RuntimeException ex) {
+            res.put("error", ex.getMessage());
+            return ResponseEntity.badRequest().body(res);
+        }
+    }
 }
