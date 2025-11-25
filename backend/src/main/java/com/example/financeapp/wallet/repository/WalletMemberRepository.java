@@ -14,7 +14,8 @@ import java.util.Optional;
 @Repository
 public interface WalletMemberRepository extends JpaRepository<WalletMember, Long> {
 
-    List<WalletMember> findByUser_UserIdAndStatus(Long userId, MemberStatus status);
+    @Query("SELECT wm FROM WalletMember wm WHERE wm.user.userId = :userId AND wm.status = :status")
+    List<WalletMember> findByUser_UserIdAndStatus(@Param("userId") Long userId, @Param("status") MemberStatus status);
 
     List<WalletMember> findByUser_UserIdAndStatusOrderByJoinedAtDesc(Long userId, MemberStatus status);
     // Tìm tất cả members của một wallet

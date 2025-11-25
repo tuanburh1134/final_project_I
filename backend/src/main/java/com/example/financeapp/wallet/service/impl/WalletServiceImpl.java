@@ -621,6 +621,7 @@ public class WalletServiceImpl implements WalletService {
                 u.getEmail(),
                 u.getAvatar(),
                 member.getRole().toString(),
+                member.getStatus().toString(),
                 member.getJoinedAt()
         );
     }

@@ -13,13 +13,14 @@ public class WalletMemberDTO {
     private String avatar;
     private String role; // "OWNER" hoặc "MEMBER"
     private LocalDateTime joinedAt;
+    private String status;
 
     // Constructors
     public WalletMemberDTO() {
     }
 
     public WalletMemberDTO(Long memberId, Long userId, String fullName, String email,
-                           String avatar, String role, LocalDateTime joinedAt) {
+                           String avatar, String role,String status, LocalDateTime joinedAt) {
         this.memberId = memberId;
         this.userId = userId;
         this.fullName = fullName;
@@ -27,6 +28,7 @@ public class WalletMemberDTO {
         this.avatar = avatar;
         this.role = role;
         this.joinedAt = joinedAt;
+        this.status = status;
     }
 
     // Getters & Setters
@@ -84,6 +86,14 @@ public class WalletMemberDTO {
 
     public void setJoinedAt(LocalDateTime joinedAt) {
         this.joinedAt = joinedAt;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
     }
 }
 
