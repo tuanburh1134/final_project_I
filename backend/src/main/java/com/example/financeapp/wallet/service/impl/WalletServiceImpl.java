@@ -250,16 +250,26 @@ public class WalletServiceImpl implements WalletService {
         if (walletMemberRepository.existsByWallet_WalletIdAndUser_UserId(walletId, memberUser.getUserId())) {
             throw new ApiException("Người dùng này đã là thành viên hoặc đang chờ xác nhận");
         }
-
+        System.out.println(">>> DEBUG START: shareWallet");
+        System.out.println(">>> Dang chuan bi tao member cho email: " + memberEmail);
         // UPDATE: Tạo thành viên với role VIEWER và status PENDING (Chờ duyệt)
         WalletMember newMember = new WalletMember(
                 wallet,
                 memberUser,
                 WalletRole.VIEWER,
-                MemberStatus.PENDING // <--- Quan trọng
+                MemberStatus.PENDING
         );
+        System.out.println(">>> DEBUG CHECK STATUS: " + newMember.getStatus());
+        // Nếu in ra ACCEPTED -> Lỗi tại Constructor trong Entity
+        // Nếu in ra PENDING  -> Lỗi do Database hoặc Hibernate tự đổi sau đó
 
-        return convertToMemberDTO(walletMemberRepository.save(newMember));
+        WalletMember savedMember = walletMemberRepository.save(newMember);
+
+        // 3. Kiểm tra lại sau khi save
+        System.out.println(">>> DEBUG AFTER SAVE: " + savedMember.getStatus());
+        System.out.println(">>> DEBUG END");
+
+        return convertToMemberDTO(savedMember);
     }
 
     @Override

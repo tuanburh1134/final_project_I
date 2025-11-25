@@ -20,7 +20,7 @@ public class WalletMember {
     @JoinColumn(name = "wallet_id", nullable = false)
     private Wallet wallet;
 
-    @ManyToOne(fetch = FetchType.LAZY) // Nên thêm LAZY
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
@@ -56,6 +56,7 @@ public class WalletMember {
 
     // --- SỬA LỖI 1: Constructor đầy đủ 4 tham số (Dùng cho tính năng mời thành viên) ---
     public WalletMember(Wallet wallet, User user, WalletRole role, MemberStatus status) {
+        System.out.println(">>> DEBUG: Goi Constructor 4 tham so. Status truyen vao la: " + status);
         this.wallet = wallet;
         this.user = user;
         this.role = role;
@@ -65,6 +66,7 @@ public class WalletMember {
 
     // --- SỬA LỖI 2: Constructor 3 tham số (Dùng cho Owner khi tạo ví) ---
     public WalletMember(Wallet wallet, User user, WalletRole role) {
+        System.out.println(">>> DEBUG: Goi Constructor 3 tham so (Default ACCEPTED)");
         this.wallet = wallet;
         this.user = user;
         this.role = role;
