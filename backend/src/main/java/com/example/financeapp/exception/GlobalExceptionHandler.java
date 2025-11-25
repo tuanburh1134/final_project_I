@@ -3,6 +3,7 @@ package com.example.financeapp.exception;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -88,6 +89,18 @@ public class GlobalExceptionHandler {
         );
 
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
+    }
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<?> handleJsonError(HttpMessageNotReadableException ex) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("success", false);
+        body.put("code", ApiErrorCode.VALIDATION_ERROR.name());
+        body.put("message", "Dữ liệu JSON không hợp lệ (Sai định dạng ngày tháng hoặc kiểu dữ liệu)");
+
+        // Chỉ lấy phần message ngắn gọn nếu cần thiết
+        // body.put("detail", ex.getMessage());
+
+        return ResponseEntity.badRequest().body(body);
     }
 }
 
