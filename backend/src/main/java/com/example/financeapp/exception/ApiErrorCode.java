@@ -23,6 +23,7 @@ public enum ApiErrorCode {
     CANNOT_DOWNGRADE_LAST_ADMIN,
     INVALID_ROLE_CHANGE,
 
+
     // OTP
     OTP_INVALID,
     OTP_EXPIRED,
@@ -33,6 +34,7 @@ public enum ApiErrorCode {
 
     // PERMISSION
     ACCESS_DENIED,
+    FORBIDDEN,
 
     // SYSTEM
     INTERNAL_ERROR

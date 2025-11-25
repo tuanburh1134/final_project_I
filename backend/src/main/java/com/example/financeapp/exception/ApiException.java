@@ -17,6 +17,14 @@ public class ApiException extends RuntimeException {
         this(code, message, HttpStatus.BAD_REQUEST);
     }
 
+    public ApiException(String message, ApiErrorCode code) {
+        this(code, message, HttpStatus.BAD_REQUEST);
+    }
+
+    public ApiException(String message) {
+        this(ApiErrorCode.VALIDATION_ERROR, message, HttpStatus.BAD_REQUEST);
+    }
+
     public ApiErrorCode getCode() {
         return code;
     }

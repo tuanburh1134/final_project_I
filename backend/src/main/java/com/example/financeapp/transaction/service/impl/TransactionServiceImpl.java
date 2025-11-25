@@ -2,6 +2,8 @@ package com.example.financeapp.transaction.service.impl;
 
 import com.example.financeapp.category.entity.Category;
 import com.example.financeapp.category.repository.CategoryRepository;
+import com.example.financeapp.exception.ApiErrorCode;
+import com.example.financeapp.exception.ApiException;
 import com.example.financeapp.transaction.dto.CreateTransactionRequest;
 import com.example.financeapp.transaction.dto.UpdateTransactionRequest;
 import com.example.financeapp.transaction.entity.Transaction;
@@ -12,9 +14,11 @@ import com.example.financeapp.transaction.service.TransactionService;
 import com.example.financeapp.user.entity.User;
 import com.example.financeapp.user.repository.UserRepository;
 import com.example.financeapp.wallet.entity.Wallet;
+import com.example.financeapp.wallet.entity.WalletMember;
+import com.example.financeapp.wallet.entity.WalletMember.WalletRole;
 import com.example.financeapp.wallet.repository.WalletMemberRepository;
 import com.example.financeapp.wallet.repository.WalletRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,63 +26,95 @@ import java.math.BigDecimal;
 import java.util.List;
 
 @Service
+@RequiredArgsConstructor // Sử dụng Lombok để inject dependencies sạch hơn
 public class TransactionServiceImpl implements TransactionService {
 
-    @Autowired private TransactionRepository transactionRepository;
-    @Autowired private UserRepository userRepository;
-    @Autowired private WalletRepository walletRepository;
-    @Autowired private TransactionTypeRepository typeRepository;
-    @Autowired private CategoryRepository categoryRepository;
-    @Autowired private WalletMemberRepository walletMemberRepository;
+    private final TransactionRepository transactionRepository;
+    private final UserRepository userRepository;
+    private final WalletRepository walletRepository;
+    private final TransactionTypeRepository typeRepository;
+    private final CategoryRepository categoryRepository;
+    private final WalletMemberRepository walletMemberRepository;
 
-    private Transaction createTransaction(Long userId, CreateTransactionRequest req, String typeName) {
-        // 1. Kiểm tra user tồn tại
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User không tồn tại"));
+    // =================================================================================
+    // PRIVATE HELPER METHODS (CLEAN CODE & RBAC)
+    // =================================================================================
 
-        // 2. ✅ Kiểm tra wallet tồn tại với PESSIMISTIC LOCK
-        // Tránh race condition khi nhiều transactions đồng thời
-        Wallet wallet = walletRepository.findByIdWithLock(req.getWalletId())
-                .orElseThrow(() -> new RuntimeException("Ví không tồn tại"));
+    /**
+     * Validate quyền tạo giao dịch:
+     * - Phải là thành viên của ví.
+     * - Không phải là VIEWER.
+     */
+    private void validateCreateAccess(Long walletId, Long userId) {
+        WalletMember member = walletMemberRepository.findByWallet_WalletIdAndUser_UserId(walletId, userId)
+                .orElseThrow(() -> new ApiException("Bạn không có quyền truy cập ví này", ApiErrorCode.FORBIDDEN));
 
-        // 3. Kiểm tra quyền truy cập (hỗ trợ shared wallet)
-        // User phải là OWNER hoặc MEMBER của ví mới được tạo transaction
-        boolean hasAccess = walletMemberRepository.existsByWallet_WalletIdAndUser_UserId(
-                req.getWalletId(),
-                userId
-        );
+        if (member.getRole() == WalletRole.VIEWER) {
+            throw new ApiException("Viewer chỉ được xem, không được tạo giao dịch", ApiErrorCode.FORBIDDEN);
+        }
+    }
 
-        if (!hasAccess) {
-            throw new RuntimeException("Bạn không có quyền truy cập ví này");
+    /**
+     * Validate quyền sửa/xóa giao dịch:
+     * - OWNER/ADMIN: Có quyền sửa/xóa tất cả.
+     * - EDITOR: Chỉ được sửa/xóa giao dịch của chính mình.
+     * - VIEWER: Không được phép.
+     */
+    private void validateModifyAccess(Transaction transaction, Long userId) {
+        Long walletId = transaction.getWallet().getWalletId();
+
+        WalletMember member = walletMemberRepository.findByWallet_WalletIdAndUser_UserId(walletId, userId)
+                .orElseThrow(() -> new ApiException("Bạn không có quyền truy cập ví này", ApiErrorCode.FORBIDDEN));
+
+        // 1. Chặn Viewer tuyệt đối
+        if (member.getRole() == WalletRole.VIEWER) {
+            throw new ApiException("Viewer không có quyền chỉnh sửa dữ liệu", ApiErrorCode.FORBIDDEN);
         }
 
-        // 4. Lấy transaction type
-        TransactionType type = typeRepository.findByTypeName(typeName)
-                .orElseThrow(() -> new RuntimeException("Loại giao dịch không tồn tại"));
+        // 2. Logic cho Editor: Chỉ được sửa bài của mình
+        if (member.getRole() == WalletRole.EDITOR) {
+            if (!transaction.getUser().getUserId().equals(userId)) {
+                throw new ApiException("Thành viên chỉ được chỉnh sửa giao dịch do mình tạo ra", ApiErrorCode.FORBIDDEN);
+            }
+        }
 
-        // 5. Lấy category và validate
+        // 3. OWNER và ADMIN được phép đi tiếp (quyền quản lý)
+    }
+
+    private Transaction createTransactionLogic(Long userId, CreateTransactionRequest req, String typeName) {
+        // 1. Validate quyền trước khi xử lý logic nặng
+        validateCreateAccess(req.getWalletId(), userId);
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ApiException("User không tồn tại", ApiErrorCode.USER_NOT_FOUND));
+
+        // 2. Lấy wallet với PESSIMISTIC LOCK để tránh race condition tính tiền
+        Wallet wallet = walletRepository.findByIdWithLock(req.getWalletId())
+                .orElseThrow(() -> new ApiException("Ví không tồn tại", ApiErrorCode.VALIDATION_ERROR));
+
+        // 3. Validate Type
+        TransactionType type = typeRepository.findByTypeName(typeName)
+                .orElseThrow(() -> new ApiException("Loại giao dịch không tồn tại", ApiErrorCode.VALIDATION_ERROR));
+
+        // 4. Validate Category
         Category category = categoryRepository.findById(req.getCategoryId())
-                .orElseThrow(() -> new RuntimeException("Danh mục không tồn tại"));
+                .orElseThrow(() -> new ApiException("Danh mục không tồn tại", ApiErrorCode.VALIDATION_ERROR));
 
         if (!category.getTransactionType().getTypeId().equals(type.getTypeId())) {
-            throw new RuntimeException("Danh mục không thuộc loại giao dịch này");
+            throw new ApiException("Danh mục không khớp với loại giao dịch", ApiErrorCode.VALIDATION_ERROR);
         }
 
-        // 6. Validate amount
+        // 5. Validate Amount
         if (req.getAmount() == null || req.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
-            throw new RuntimeException("Số tiền phải lớn hơn 0");
+            throw new ApiException("Số tiền phải lớn hơn 0", ApiErrorCode.VALIDATION_ERROR);
         }
 
-        // 7. Kiểm tra số dư đủ cho chi tiêu
+        // 6. Tính toán số dư
         if ("Chi tiêu".equals(typeName)) {
             BigDecimal newBalance = wallet.getBalance().subtract(req.getAmount());
+            // Tùy chọn: Cho phép âm ví hay không? Ở đây logic cũ là chặn âm.
             if (newBalance.compareTo(BigDecimal.ZERO) < 0) {
-                throw new RuntimeException(
-                        "Số dư không đủ. Số dư hiện tại: " + wallet.getBalance() +
-                                " " + wallet.getCurrencyCode() +
-                                ", Số tiền chi tiêu: " + req.getAmount() +
-                                " " + wallet.getCurrencyCode()
-                );
+                throw new ApiException("Số dư ví không đủ để thực hiện chi tiêu", ApiErrorCode.VALIDATION_ERROR);
             }
             wallet.setBalance(newBalance);
         } else {
@@ -86,10 +122,9 @@ public class TransactionServiceImpl implements TransactionService {
             wallet.setBalance(wallet.getBalance().add(req.getAmount()));
         }
 
-        // 8. Save wallet với balance mới
         walletRepository.save(wallet);
 
-        // 9. Tạo transaction
+        // 7. Tạo Transaction
         Transaction tx = new Transaction();
         tx.setUser(user);
         tx.setWallet(wallet);
@@ -103,92 +138,95 @@ public class TransactionServiceImpl implements TransactionService {
         return transactionRepository.save(tx);
     }
 
+    // =================================================================================
+    // PUBLIC SERVICE METHODS
+    // =================================================================================
+
     @Override
     @Transactional
     public Transaction createExpense(Long userId, CreateTransactionRequest request) {
-        return createTransaction(userId, request, "Chi tiêu");
+        return createTransactionLogic(userId, request, "Chi tiêu");
     }
 
     @Override
     @Transactional
     public Transaction createIncome(Long userId, CreateTransactionRequest request) {
-        return createTransaction(userId, request, "Thu nhập");
+        return createTransactionLogic(userId, request, "Thu nhập");
     }
 
     @Override
     @Transactional
     public Transaction updateTransaction(Long userId, Long transactionId, UpdateTransactionRequest request) {
-        // 1. Kiểm tra transaction tồn tại
+        // 1. Tìm giao dịch
         Transaction transaction = transactionRepository.findById(transactionId)
-                .orElseThrow(() -> new RuntimeException("Giao dịch không tồn tại"));
+                .orElseThrow(() -> new ApiException("Giao dịch không tồn tại", ApiErrorCode.VALIDATION_ERROR));
 
-        // 2. Kiểm tra quyền: user phải là owner của transaction
-        if (!transaction.getUser().getUserId().equals(userId)) {
-            throw new RuntimeException("Bạn không có quyền sửa giao dịch này");
-        }
+        // 2. Kiểm tra phân quyền (RBAC)
+        validateModifyAccess(transaction, userId);
 
-        // 3. Lấy category mới và validate
+        // 3. Validate Category mới
         Category category = categoryRepository.findById(request.getCategoryId())
-                .orElseThrow(() -> new RuntimeException("Danh mục không tồn tại"));
+                .orElseThrow(() -> new ApiException("Danh mục không tồn tại", ApiErrorCode.VALIDATION_ERROR));
 
-        // 4. Validate category phải cùng loại với transaction type hiện tại
+        // Category mới phải cùng loại (Chi tiêu/Thu nhập) với transaction cũ
         if (!category.getTransactionType().getTypeId().equals(transaction.getTransactionType().getTypeId())) {
-            throw new RuntimeException("Danh mục không thuộc loại giao dịch này");
+            throw new ApiException("Không thể đổi loại giao dịch (Chi tiêu <-> Thu nhập) khi cập nhật", ApiErrorCode.VALIDATION_ERROR);
         }
 
-        // 5. Cập nhật các field được phép sửa
+        // 4. Cập nhật thông tin
         transaction.setCategory(category);
         transaction.setNote(request.getNote());
         transaction.setImageUrl(request.getImageUrl());
 
-        // 6. Lưu lại (updatedAt sẽ tự động cập nhật nhờ @PreUpdate)
+        // Lưu ý: Logic hiện tại chưa hỗ trợ sửa số tiền (Amount).
+        // Nếu sửa amount thì phải tính toán lại balance của Wallet (cộng cũ, trừ mới), khá phức tạp.
+        // Tốt nhất nên khuyên user xóa đi tạo lại nếu sai số tiền.
+
         return transactionRepository.save(transaction);
     }
 
     @Override
     @Transactional
     public void deleteTransaction(Long userId, Long transactionId) {
-        // 1. Kiểm tra transaction tồn tại
+        // 1. Tìm giao dịch
         Transaction transaction = transactionRepository.findById(transactionId)
-                .orElseThrow(() -> new RuntimeException("Giao dịch không tồn tại"));
+                .orElseThrow(() -> new ApiException("Giao dịch không tồn tại", ApiErrorCode.VALIDATION_ERROR));
 
-        // 2. Kiểm tra quyền: user phải là owner của transaction
-        if (!transaction.getUser().getUserId().equals(userId)) {
-            throw new RuntimeException("Bạn không có quyền xóa giao dịch này");
-        }
+        // 2. Kiểm tra phân quyền (RBAC)
+        validateModifyAccess(transaction, userId);
 
-        // 3. Lấy wallet với PESSIMISTIC LOCK để tránh race condition
+        // 3. Lock ví để revert tiền
         Wallet wallet = walletRepository.findByIdWithLock(transaction.getWallet().getWalletId())
-                .orElseThrow(() -> new RuntimeException("Ví không tồn tại"));
+                .orElseThrow(() -> new ApiException("Ví không tồn tại", ApiErrorCode.VALIDATION_ERROR));
 
-        // 4. Kiểm tra loại giao dịch và tính toán số dư mới
+        // 4. Revert số dư
         String typeName = transaction.getTransactionType().getTypeName();
         BigDecimal amount = transaction.getAmount();
         BigDecimal newBalance;
 
         if ("Chi tiêu".equals(typeName)) {
-            // Xóa chi tiêu: cộng lại số tiền vào ví
+            // Xóa chi tiêu -> Tiền quay về ví (Cộng)
             newBalance = wallet.getBalance().add(amount);
         } else {
-            // Xóa thu nhập: trừ lại số tiền từ ví
+            // Xóa thu nhập -> Tiền mất đi (Trừ)
             newBalance = wallet.getBalance().subtract(amount);
         }
 
-        // 5. Kiểm tra số dư không được âm
+        // Check âm ví khi xóa thu nhập
         if (newBalance.compareTo(BigDecimal.ZERO) < 0) {
-            throw new RuntimeException("Không thể xóa giao dịch vì ví không được âm tiền");
+            throw new ApiException("Không thể xóa khoản thu nhập này vì số dư ví sẽ bị âm", ApiErrorCode.VALIDATION_ERROR);
         }
 
-        // 6. Cập nhật số dư ví
         wallet.setBalance(newBalance);
         walletRepository.save(wallet);
 
-        // 7. Xóa transaction
+        // 5. Xóa
         transactionRepository.delete(transaction);
     }
 
     @Override
     public List<Transaction> getAllTransactions(Long userId) {
+        // Có thể thêm logic filter chỉ lấy transaction của các ví mà user có quyền truy cập
         return transactionRepository.findByUser_UserIdOrderByTransactionDateDesc(userId);
     }
 }

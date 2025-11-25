@@ -33,8 +33,10 @@ public class WalletMember {
 
     // Enum cho roles
     public enum WalletRole {
-        OWNER,   // Chủ sở hữu ví
-        MEMBER   // Thành viên được chia sẻ
+        OWNER,  // Chủ ví: Full quyền, không ai được đụng vào
+        ADMIN,  // Quản lý: Quản lý thành viên (trừ Owner), sửa ví
+        EDITOR, // Thành viên: Thêm/Sửa/Xóa giao dịch
+        VIEWER  // Người xem: Chỉ xem, không thao tác
     }
 
     // Constructors
@@ -94,8 +96,12 @@ public class WalletMember {
         return this.role == WalletRole.OWNER;
     }
 
-    public boolean isMember() {
-        return this.role == WalletRole.MEMBER;
+    public boolean isAdmin() {
+        return this.role == WalletRole.ADMIN;
     }
+
+    public boolean isEditor() {return this.role == WalletRole.EDITOR;}
+
+    public boolean isViewer() {return this.role == WalletRole.VIEWER;}
 }
 
