@@ -6,6 +6,7 @@ import "../../styles/pages/ReportsPage.css";
 import { useWalletData } from "../../contexts/WalletDataContext";
 import { transactionAPI } from "../../services/transaction.service";
 import { walletAPI } from "../../services";
+import { API_BASE_URL } from "../../services/api-helper";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { useAuth } from "../../contexts/AuthContext";
 
@@ -629,6 +630,38 @@ export default function ReportsPage() {
     }, 250);
   };
 
+  // Export XLSX/CSV via backend
+  const handleDownloadReport = async (format = "xlsx") => {
+    if (!selectedWalletId) return;
+    try {
+      const token = localStorage.getItem("accessToken");
+      const url = `${API_BASE_URL}/api/reports/transactions?walletId=${selectedWalletId}&format=${encodeURIComponent(format)}`;
+      const res = await fetch(url, {
+        method: "GET",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(txt || `HTTP ${res.status}`);
+      }
+
+      const blob = await res.blob();
+      const cd = res.headers.get("Content-Disposition") || "";
+      const match = cd.match(/filename=\"?([^\";]+)\"?/);
+      const filename = match ? match[1] : `transactions_${selectedWalletId}.${format}`;
+
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(link.href);
+    } catch (err) {
+      alert(err.message || "Không thể tải báo cáo.");
+    }
+  };
+
   const chartData = useMemo(() => buildChartData(walletTransactions, range), [walletTransactions, range]);
   const chartMaxValue = chartData.reduce((max, item) => Math.max(max, item.income, item.expense), 0);
   const yAxisTicks = useMemo(() => {
@@ -1133,14 +1166,34 @@ export default function ReportsPage() {
                       {/* Export PDF Button */}
                       {walletTransactions.length > 0 && (
                         <div className="reports-export-pdf-wrapper">
-                          <button
-                            type="button"
-                            className="btn btn-primary reports-export-pdf-btn"
-                            onClick={() => handleExportPDF()}
-                          >
-                            <i className="bi bi-file-earmark-pdf me-2" />
-                            {t("reports.export_pdf") || "Xuất PDF"}
-                          </button>
+                          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                            <button
+                              type="button"
+                              className="btn btn-success"
+                              onClick={() => handleDownloadReport("xlsx")}
+                              disabled={!selectedWalletId}
+                            >
+                              <i className="bi bi-file-earmark-excel me-2" /> Xuất XLSX
+                            </button>
+
+                            <button
+                              type="button"
+                              className="btn btn-outline-secondary"
+                              onClick={() => handleDownloadReport("csv")}
+                              disabled={!selectedWalletId}
+                            >
+                              <i className="bi bi-file-earmark-text me-2" /> Xuất CSV
+                            </button>
+
+                            <button
+                              type="button"
+                              className="btn btn-primary reports-export-pdf-btn"
+                              onClick={() => handleExportPDF()}
+                            >
+                              <i className="bi bi-file-earmark-pdf me-2" />
+                              {t("reports.export_pdf") || "Xuất PDF"}
+                            </button>
+                          </div>
                         </div>
                       )}
                     </div>

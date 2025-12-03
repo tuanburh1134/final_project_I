@@ -1,13 +1,14 @@
 package com.example.financeapp.transaction.repository;
 
-import com.example.financeapp.transaction.entity.Transaction;
+import java.math.BigDecimal;
+import java.util.List;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-import java.math.BigDecimal;
-import java.util.List;
+import com.example.financeapp.transaction.entity.Transaction;
 
 public interface TransactionRepository extends JpaRepository<Transaction, Long> {
 
@@ -118,16 +119,16 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
     /**
      * Lấy ngày giao dịch sớm nhất trong phạm vi budget để phục vụ việc chỉnh sửa.
      */
-    @Query("""
-        SELECT MIN(DATE(t.transactionDate))
-        FROM Transaction t
-        WHERE t.user.userId = :userId
-          AND t.category.categoryId = :categoryId
-          AND (:walletId IS NULL OR t.wallet.walletId = :walletId)
-        """)
-    java.time.LocalDate findEarliestTransactionDate(
-            @Param("userId") Long userId,
-            @Param("categoryId") Long categoryId,
-            @Param("walletId") Long walletId
-    );
+                @Query("""
+                                SELECT MIN(t.transactionDate)
+                                FROM Transaction t
+                                WHERE t.user.userId = :userId
+                                        AND t.category.categoryId = :categoryId
+                                        AND (:walletId IS NULL OR t.wallet.walletId = :walletId)
+                                """)
+                java.time.LocalDateTime findEarliestTransactionDate(
+                                                @Param("userId") Long userId,
+                                                @Param("categoryId") Long categoryId,
+                                                @Param("walletId") Long walletId
+                );
 }

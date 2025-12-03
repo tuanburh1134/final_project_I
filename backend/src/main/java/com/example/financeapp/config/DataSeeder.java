@@ -1,22 +1,25 @@
 package com.example.financeapp.config;
 
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.context.annotation.Profile;
+import org.springframework.stereotype.Component;
+
 import com.example.financeapp.category.entity.Category;
 import com.example.financeapp.category.repository.CategoryRepository;
 import com.example.financeapp.transaction.entity.TransactionType;
 import com.example.financeapp.transaction.repository.TransactionTypeRepository;
 import com.example.financeapp.wallet.entity.Currency;
 import com.example.financeapp.wallet.repository.CurrencyRepository;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.CommandLineRunner;
-import org.springframework.stereotype.Component;
-
-import java.util.List;
 
 /**
  * Lớp này sẽ tự động chạy khi ứng dụng khởi động.
  * Nó dùng để "gieo" dữ liệu mầm (seed data) cho database.
  */
 @Component
+@Profile("!test")
 public class DataSeeder implements CommandLineRunner {
 
     @Autowired private CurrencyRepository currencyRepository;

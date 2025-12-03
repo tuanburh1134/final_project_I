@@ -1,5 +1,16 @@
 package com.example.financeapp.budget.service.impl;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.example.financeapp.budget.dto.BudgetResponse;
 import com.example.financeapp.budget.dto.CreateBudgetRequest;
 import com.example.financeapp.budget.dto.UpdateBudgetRequest;
@@ -16,16 +27,6 @@ import com.example.financeapp.user.repository.UserRepository;
 import com.example.financeapp.wallet.entity.Wallet;
 import com.example.financeapp.wallet.repository.WalletRepository;
 import com.example.financeapp.wallet.service.WalletService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.util.EnumSet;
-import java.util.List;
-import java.util.Objects;
-import java.util.stream.Collectors;
 
 @Service
 public class BudgetServiceImpl implements BudgetService {
@@ -286,11 +287,15 @@ public class BudgetServiceImpl implements BudgetService {
         }
 
         Long walletId = budget.getWallet() != null ? budget.getWallet().getWalletId() : null;
-        LocalDate earliestTransactionDate = transactionRepository.findEarliestTransactionDate(
-                budget.getUser().getUserId(),
-                budget.getCategory().getCategoryId(),
-                walletId
+        java.time.LocalDateTime earliestTransactionDateTime = transactionRepository.findEarliestTransactionDate(
+            budget.getUser().getUserId(),
+            budget.getCategory().getCategoryId(),
+            walletId
         );
+
+        java.time.LocalDate earliestTransactionDate = earliestTransactionDateTime != null
+            ? earliestTransactionDateTime.toLocalDate()
+            : null;
 
         if (earliestTransactionDate != null && newStartDate.isBefore(earliestTransactionDate)) {
             throw new RuntimeException("Ngày bắt đầu không được nhỏ hơn ngày giao dịch đã phát sinh (" + earliestTransactionDate + ")");

@@ -1,19 +1,22 @@
 package com.example.financeapp;
 
+import java.util.TimeZone;
+
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Profile;
+import org.springframework.scheduling.annotation.EnableScheduling;
+import org.springframework.security.crypto.password.PasswordEncoder;
+
 import com.example.financeapp.cloud.storage.CloudStorageProperties;
 import com.example.financeapp.security.Role;
 import com.example.financeapp.user.entity.User;
 import com.example.financeapp.user.repository.UserRepository;
-import jakarta.annotation.PostConstruct;
-import org.springframework.boot.CommandLineRunner;
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.context.annotation.Bean;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import org.springframework.scheduling.annotation.EnableScheduling;
-import org.springframework.security.crypto.password.PasswordEncoder;
 
-import java.util.TimeZone;
+import jakarta.annotation.PostConstruct;
 
 @SpringBootApplication
 @EnableScheduling
@@ -34,6 +37,7 @@ public class FinanceAppApplication {
      * Tạo ADMIN mặc định khi chạy lần đầu
      */
     @Bean
+    @Profile("!test")
     CommandLineRunner initAdmin(UserRepository userRepository, PasswordEncoder encoder) {
         return args -> {
             String adminEmail = "admin@financeapp.com";
