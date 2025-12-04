@@ -9,7 +9,7 @@ public interface ExchangeRateService {
 
     /**
      * Lấy tỷ giá chuyển đổi từ fromCurrency sang toCurrency
-     * 
+     * lấy tỉ giá chuyển nhượng cổ phần
      * @param fromCurrency Loại tiền nguồn (VD: "USD")
      * @param toCurrency Loại tiền đích (VD: "VND")
      * @return Tỷ giá (VD: 1 USD = 24,350 VND → return 24350.0)
