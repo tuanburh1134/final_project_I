@@ -10,20 +10,7 @@ public interface ExchangeRateService {
     /**
      * Lấy tỷ giá chuyển đổi từ fromCurrency sang toCurrency
      * lấy tỉ giá chuyển nhượng cổ phần
-     * git checkout bfeatureádasdsd
-     * intelliji fact bis
-     * fix main develop origin
-     * big C bú source 1ssssádasds
-     * g 11 arial bolth bảonádasdsa
-     * gggg:)))ssssssádasdádsad
-     * ádasds dá đá h sadjkfhshf jshadfjhhshfhsjdfhsdfhjashjf gsdfjsdhf
-     * @param fromCurrency Loại tiền nguồn (VD: "USD")ádasd
-     * @param toCurrency Loại tiền đích (VD: "VND")
-     *                   mảiana
-     * @return Tỷ giá (VD: 1 USD = 24,350 VND → return 24350.0)
-     * return facrt,in finiti war :))))\
-     * delasdss
-    BigDecimal getExchangeRate(String fromCurrency, String toCurrency);
+
 
     /**
      * Chuyển đổi số tiền từ currency này sang currency khác
