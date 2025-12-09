@@ -14,10 +14,11 @@ import java.util.Date;
 @Component
 public class JwtUtil {
 
-    @Value("${app.jwt-secret}")
+    // Default is base64("dev-secret-please-set") to avoid startup failure when env is missing
+    @Value("${app.jwt-secret:${APP_JWT_SECRET:ZGV2LXNlY3JldC1wbGVhc2Utc2V0}}")
     private String jwtSecret;
 
-    @Value("${app.jwt-expiration-ms}")
+    @Value("${app.jwt-expiration-ms:${APP_JWT_EXPIRATION_MS:86400000}}")
     private long jwtExpirationMs;
 
     // Refresh token sống lâu hơn access token (7 ngày)
